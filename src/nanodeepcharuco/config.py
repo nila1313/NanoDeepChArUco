@@ -22,6 +22,16 @@ class RunConfig:
     gamma: float
     deep_self_ransac_px: float
 
+    auto_sync: bool
+    sync_offsets: list[int]
+    sync_frame_step: int
+    sync_window_size: int
+    sync_window_step: int
+    sync_min_inlier_ratio: float
+    sync_min_ratio_gap: float
+    sync_min_persistence: int
+    sync_max_gap_frames: int
+
     nano_executable: str
     deepcharuco_root: str
     deep_checkpoint: str
@@ -67,6 +77,71 @@ def resolve_config(args) -> RunConfig:
         detect_only=args.detect_only,
         gamma=args.gamma,
         deep_self_ransac_px=args.deep_self_ransac_px,
+
+        auto_sync=bool(
+            getattr(
+                args,
+                "auto_sync",
+                False,
+            )
+        ),
+        sync_offsets=list(
+            getattr(
+                args,
+                "sync_offsets",
+                None,
+            )
+            or range(-3, 4)
+        ),
+        sync_frame_step=int(
+            getattr(
+                args,
+                "sync_frame_step",
+                1,
+            )
+        ),
+        sync_window_size=int(
+            getattr(
+                args,
+                "sync_window_size",
+                100,
+            )
+        ),
+        sync_window_step=int(
+            getattr(
+                args,
+                "sync_window_step",
+                100,
+            )
+        ),
+        sync_min_inlier_ratio=float(
+            getattr(
+                args,
+                "sync_min_inlier_ratio",
+                0.20,
+            )
+        ),
+        sync_min_ratio_gap=float(
+            getattr(
+                args,
+                "sync_min_ratio_gap",
+                0.05,
+            )
+        ),
+        sync_min_persistence=int(
+            getattr(
+                args,
+                "sync_min_persistence",
+                2,
+            )
+        ),
+        sync_max_gap_frames=int(
+            getattr(
+                args,
+                "sync_max_gap_frames",
+                400,
+            )
+        ),
 
         nano_executable=str(
             Path(args.nano_executable)
