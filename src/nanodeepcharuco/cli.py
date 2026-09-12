@@ -1022,7 +1022,7 @@ def main() -> None:
 
             output_path = (
                 run_dir
-                / f"detection_{cam_idx:03d}.npy"
+                / f"detection_{cam_idx:03d}.yml"
             )
 
             expected_n_ids = (
@@ -1066,6 +1066,9 @@ def main() -> None:
             "auto_sync     : disabled"
         )
 
+        camera_runs = []
+        expected_marker_ids_by_camera = []
+
         for cam_idx, (
             video_path,
             frame_offset,
@@ -1102,9 +1105,8 @@ def main() -> None:
                 ),
             )
 
-            output_path = (
-                run_dir
-                / f"detection_{cam_idx:03d}.npy"
+            camera_runs.append(
+                run
             )
 
             expected_n_ids = (
@@ -1112,15 +1114,64 @@ def main() -> None:
                 * (detector.board_height - 1)
             )
 
-            expected_marker_ids = list(
-                range(expected_n_ids)
+            expected_marker_ids_by_camera.append(
+                list(
+                    range(expected_n_ids)
+                )
+            )
+
+        shared_detection_ids = sorted(
+            set.intersection(
+                *[
+                    set(
+                        run.detections_by_index
+                    )
+                    for run in camera_runs
+                ]
+            )
+        )
+
+        if not shared_detection_ids:
+            raise RuntimeError(
+                "No shared logical detection indices "
+                "remain across cameras."
+            )
+
+        camera_runs = [
+            restrict_camera_run(
+                run,
+                shared_detection_ids,
+            )
+            for run in camera_runs
+        ]
+
+        print()
+        print(
+            "shared fixed-offset stereo frames:",
+            len(shared_detection_ids),
+        )
+        print(
+            "shared logical range             :",
+            shared_detection_ids[0],
+            "to",
+            shared_detection_ids[-1],
+        )
+
+        for cam_idx, run in enumerate(
+            camera_runs
+        ):
+            output_path = (
+                run_dir
+                / f"detection_{cam_idx:03d}.yml"
             )
 
             payload = save_camera_run_payload(
                 run,
                 output_path,
                 expected_marker_ids=(
-                    expected_marker_ids
+                    expected_marker_ids_by_camera[
+                        cam_idx
+                    ]
                 ),
             )
 
@@ -1164,7 +1215,7 @@ def main() -> None:
 
         detection_paths = [
             run_dir
-            / f"detection_{cam_idx:03d}.npy"
+            / f"detection_{cam_idx:03d}.yml"
             for cam_idx
             in range(len(config.videos))
         ]

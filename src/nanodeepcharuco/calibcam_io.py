@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import numpy as np
+import yaml
 
 
 def build_calibcam_payload(
@@ -162,6 +163,15 @@ def save_calibcam_payload(
     path: str | Path,
     payload: dict,
 ) -> Path:
+    """
+    Save a CalibCam detection payload.
+
+    YAML is the preferred portable format because it avoids
+    NumPy pickle compatibility problems between environments.
+
+    Legacy .npy output remains supported for compatibility.
+    """
+
     path = (
         Path(path)
         .expanduser()
@@ -173,11 +183,35 @@ def save_calibcam_payload(
         exist_ok=True,
     )
 
-    np.save(
-        path,
-        payload,
-        allow_pickle=True,
-    )
+    suffix = path.suffix.lower()
+
+    if suffix in {
+        ".yaml",
+        ".yml",
+    }:
+        with path.open(
+            "w",
+            encoding="utf-8",
+        ) as f:
+            yaml.safe_dump(
+                payload,
+                f,
+                sort_keys=False,
+            )
+
+    elif suffix == ".npy":
+        np.save(
+            path,
+            payload,
+            allow_pickle=True,
+        )
+
+    else:
+        raise ValueError(
+            "Unsupported CalibCam payload format: "
+            f"{path.suffix}. "
+            "Use .yaml, .yml, or .npy."
+        )
 
     return path
 
@@ -196,10 +230,40 @@ def load_calibcam_payload(
             f"Detection payload not found: {path}"
         )
 
-    return np.load(
-        path,
-        allow_pickle=True,
-    ).item()
+    suffix = path.suffix.lower()
+
+    if suffix in {
+        ".yaml",
+        ".yml",
+    }:
+        with path.open(
+            "r",
+            encoding="utf-8",
+        ) as f:
+            payload = yaml.safe_load(f)
+
+        if not isinstance(
+            payload,
+            dict,
+        ):
+            raise ValueError(
+                "CalibCam YAML payload must contain "
+                "a mapping at the document root."
+            )
+
+        return payload
+
+    if suffix == ".npy":
+        return np.load(
+            path,
+            allow_pickle=True,
+        ).item()
+
+    raise ValueError(
+        "Unsupported CalibCam payload format: "
+        f"{path.suffix}. "
+        "Use .yaml, .yml, or .npy."
+    )
 
 
 def summarize_calibcam_payload(
