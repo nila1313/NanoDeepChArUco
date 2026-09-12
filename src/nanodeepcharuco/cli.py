@@ -5,6 +5,7 @@ import subprocess
 from pathlib import Path
 
 from nanodeepcharuco.config import (
+    apply_profile,
     prepare_run_directory,
     resolve_config,
     save_resolved_config,
@@ -154,32 +155,43 @@ def build_parser() -> argparse.ArgumentParser:
     )
 
     parser.add_argument(
+        "--profile",
+        default=None,
+        help=(
+            "Portable NanoDeepChArUco asset profile name "
+            "(for example large_7x7 or small_5x6), "
+            "or path to a profile YAML file. "
+            "Explicit asset path arguments override profile values."
+        ),
+    )
+
+    parser.add_argument(
         "--nano_executable",
-        required=True,
+        default=None,
         help="Path to the ArUco Nano detect_batch executable.",
     )
 
     parser.add_argument(
         "--deepcharuco_root",
-        required=True,
+        default=None,
         help="Path to the DeepChArUco source directory.",
     )
 
     parser.add_argument(
         "--deep_checkpoint",
-        required=True,
+        default=None,
         help="Path to the DeepChArUco detector checkpoint.",
     )
 
     parser.add_argument(
         "--refinenet_checkpoint",
-        required=True,
+        default=None,
         help="Path to the DeepChArUco RefineNet checkpoint.",
     )
 
     parser.add_argument(
         "--deep_config",
-        required=True,
+        default=None,
         help="Path to the DeepChArUco YAML configuration.",
     )
 
@@ -372,6 +384,28 @@ def validate_args(args: argparse.Namespace) -> None:
     if not Path(args.board).is_file():
         raise FileNotFoundError(
             f"Board file not found: {args.board}"
+        )
+
+    required_assets = {
+        "Nano executable": args.nano_executable,
+        "DeepChArUco source": args.deepcharuco_root,
+        "Deep checkpoint": args.deep_checkpoint,
+        "RefineNet checkpoint": args.refinenet_checkpoint,
+        "Deep config": args.deep_config,
+    }
+
+    missing_assets = [
+        name
+        for name, value
+        in required_assets.items()
+        if value is None
+    ]
+
+    if missing_assets:
+        raise ValueError(
+            "Missing NanoDeepChArUco assets: "
+            + ", ".join(missing_assets)
+            + ". Provide --profile or explicit path arguments."
         )
 
     if not Path(args.nano_executable).is_file():
@@ -844,6 +878,8 @@ def _resolve_auto_sync_runs(
 def main() -> None:
     parser = build_parser()
     args = parser.parse_args()
+
+    args = apply_profile(args)
 
     validate_args(args)
 

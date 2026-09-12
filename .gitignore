@@ -24,3 +24,9 @@ models/*
 *.ckpt
 *.pth
 *.pt
+
+third_party/aruco_nano/*
+!third_party/aruco_nano/README.md
+
+third_party/deepcharuco/*
+!third_party/deepcharuco/README.md

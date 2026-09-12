@@ -1,0 +1,15 @@
+name: large_7x7
+
+deep_config: configs/deep/large_7x7.yaml
+
+deep_checkpoint:
+  models/deepcharuco/large_7x7/detector.ckpt
+
+refinenet_checkpoint:
+  models/refinenet/refinenet.ckpt
+
+deepcharuco_root:
+  third_party/deepcharuco/source
+
+nano_executable:
+  third_party/aruco_nano/detect_batch

@@ -1,0 +1,15 @@
+name: small_5x6
+
+deep_config: configs/deep/small_5x6.yaml
+
+deep_checkpoint:
+  models/deepcharuco/small_5x6/detector.ckpt
+
+refinenet_checkpoint:
+  models/refinenet/refinenet.ckpt
+
+deepcharuco_root:
+  third_party/deepcharuco/source
+
+nano_executable:
+  third_party/aruco_nano/detect_batch

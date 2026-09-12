@@ -7,6 +7,109 @@ from typing import Optional
 import yaml
 
 
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+
+
+def apply_profile(args):
+    """
+    Fill external Nano/Deep asset paths from a profile.
+
+    Explicit command-line paths always win over profile values.
+
+    --profile may be either:
+      - a built-in profile name such as "large_7x7"
+      - a path to a YAML profile file
+    """
+
+    profile_name = getattr(
+        args,
+        "profile",
+        None,
+    )
+
+    if profile_name is None:
+        return args
+
+    requested = Path(
+        str(profile_name)
+    ).expanduser()
+
+    if requested.suffix.lower() in {
+        ".yaml",
+        ".yml",
+    } or requested.is_absolute():
+        profile_path = requested
+    else:
+        profile_path = (
+            PROJECT_ROOT
+            / "configs"
+            / "profiles"
+            / f"{profile_name}.yaml"
+        )
+
+    profile_path = (
+        profile_path
+        .expanduser()
+        .resolve()
+    )
+
+    if not profile_path.is_file():
+        raise FileNotFoundError(
+            "NanoDeepChArUco profile not found: "
+            f"{profile_path}"
+        )
+
+    with profile_path.open("r") as f:
+        profile = yaml.safe_load(f) or {}
+
+    required_keys = [
+        "nano_executable",
+        "deepcharuco_root",
+        "deep_checkpoint",
+        "refinenet_checkpoint",
+        "deep_config",
+    ]
+
+    missing = [
+        key
+        for key in required_keys
+        if key not in profile
+    ]
+
+    if missing:
+        raise ValueError(
+            "Profile is missing required fields: "
+            + ", ".join(missing)
+        )
+
+    for key in required_keys:
+        # Explicit CLI argument wins.
+        if getattr(args, key, None) is not None:
+            continue
+
+        value = Path(
+            str(profile[key])
+        ).expanduser()
+
+        if not value.is_absolute():
+            value = (
+                PROJECT_ROOT
+                / value
+            )
+
+        setattr(
+            args,
+            key,
+            str(value.resolve()),
+        )
+
+    args.profile = str(
+        profile_path
+    )
+
+    return args
+
+
 @dataclass
 class RunConfig:
     videos: list[str]
