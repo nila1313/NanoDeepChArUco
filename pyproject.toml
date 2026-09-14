@@ -9,9 +9,15 @@ description = "CalibCam-style Nano + DeepChArUco detection and calibration pipel
 readme = "README.md"
 requires-python = ">=3.10,<3.12"
 dependencies = [
-    "numpy",
-    "opencv-python",
-    "PyYAML",
+    "numpy==1.23.5",
+    "opencv-contrib-python-headless==4.11.0.86",
+    "PyYAML==6.0.3",
+    "numba==0.56.4",
+    "torch==2.0.1",
+    "pytorch-lightning==1.9.3",
+    "torchmetrics==0.11.1",
+    "pydantic==2.13.5",
+    "lightning-utilities==0.15.3",
 ]
 
 [project.scripts]
