@@ -6,6 +6,7 @@ from pathlib import Path
 
 from nanodeepcharuco.config import (
     apply_profile,
+    apply_runtime_backend,
     prepare_run_directory,
     resolve_config,
     save_resolved_config,
@@ -301,8 +302,10 @@ def build_parser() -> argparse.ArgumentParser:
         "--calibcam_python",
         default=None,
         help=(
-            "Python executable for the verified CalibCam environment. "
-            "Required unless --detect_only is used."
+            "Optional Python executable override for CalibCam. "
+            "If omitted, NanoDeepChArUco uses the runtime backend "
+            "configured by setup.sh or "
+            "NANODEEPCHARUCO_CALIBCAM_PYTHON."
         ),
     )
 
@@ -890,6 +893,7 @@ def main() -> None:
     args = parser.parse_args()
 
     args = apply_profile(args)
+    args = apply_runtime_backend(args)
 
     validate_args(args)
 

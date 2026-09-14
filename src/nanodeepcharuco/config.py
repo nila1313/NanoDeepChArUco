@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import os
+
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Optional
@@ -8,6 +10,61 @@ import yaml
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
+
+RUNTIME_BACKEND_CONFIG = (
+    PROJECT_ROOT
+    / ".nanodeepcharuco"
+    / "backend.yml"
+)
+
+
+def apply_runtime_backend(args):
+    """
+    Resolve the CalibCam Python executable automatically.
+
+    Resolution order:
+
+    1. Explicit --calibcam_python
+    2. NANODEEPCHARUCO_CALIBCAM_PYTHON environment variable
+    3. Repository-local runtime backend configuration written
+       by setup.sh
+
+    Explicit command-line configuration always wins.
+    """
+
+    if getattr(args, "calibcam_python", None) is not None:
+        return args
+
+    env_python = os.environ.get(
+        "NANODEEPCHARUCO_CALIBCAM_PYTHON"
+    )
+
+    if env_python:
+        args.calibcam_python = str(
+            Path(env_python)
+            .expanduser()
+            .resolve()
+        )
+        return args
+
+    if not RUNTIME_BACKEND_CONFIG.is_file():
+        return args
+
+    with RUNTIME_BACKEND_CONFIG.open("r") as f:
+        runtime = yaml.safe_load(f) or {}
+
+    calibcam_python = runtime.get(
+        "calibcam_python"
+    )
+
+    if calibcam_python:
+        args.calibcam_python = str(
+            Path(calibcam_python)
+            .expanduser()
+            .resolve()
+        )
+
+    return args
 
 
 def apply_profile(args):

@@ -47,3 +47,6 @@ third_party/aruco_nano/build/
 third_party/deepcharuco/*
 !third_party/deepcharuco/README.md
 !third_party/deepcharuco/upstream
+
+# Machine-local NanoDeepChArUco runtime configuration
+.nanodeepcharuco/
