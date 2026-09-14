@@ -1,0 +1,3 @@
+[submodule "third_party/deepcharuco/upstream"]
+	path = third_party/deepcharuco/upstream
+	url = https://github.com/JunkyByte/deepcharuco.git

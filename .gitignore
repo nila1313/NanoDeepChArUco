@@ -15,6 +15,13 @@ runs/*
 
 models/*
 !models/README.md
+!models/deepcharuco/
+!models/deepcharuco/large_7x7/
+!models/deepcharuco/large_7x7/detector.ckpt
+!models/deepcharuco/small_5x6/
+!models/deepcharuco/small_5x6/detector.ckpt
+!models/refinenet/
+!models/refinenet/refinenet.ckpt
 
 *.MP4
 *.mp4
@@ -25,8 +32,18 @@ models/*
 *.pth
 *.pt
 
+!models/deepcharuco/large_7x7/detector.ckpt
+!models/deepcharuco/small_5x6/detector.ckpt
+!models/refinenet/refinenet.ckpt
+
 third_party/aruco_nano/*
 !third_party/aruco_nano/README.md
+!third_party/aruco_nano/LICENSE
+!third_party/aruco_nano/provenance.json
+!third_party/aruco_nano/source/
+!third_party/aruco_nano/source/**
+third_party/aruco_nano/build/
 
 third_party/deepcharuco/*
 !third_party/deepcharuco/README.md
+!third_party/deepcharuco/upstream

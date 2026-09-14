@@ -11,7 +11,7 @@ refinenet_checkpoint:
   models/refinenet/refinenet.ckpt
 
 deepcharuco_root:
-  third_party/deepcharuco/source
+  third_party/deepcharuco/upstream/src
 
 nano_executable:
-  third_party/aruco_nano/detect_batch
+  third_party/aruco_nano/build/detect_batch
