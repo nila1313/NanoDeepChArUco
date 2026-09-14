@@ -1,5 +1,7 @@
 name: large_7x7
 
+board: configs/boards/large_7x7.npy
+
 deep_config: configs/deep/large_7x7.yaml
 
 deep_checkpoint:

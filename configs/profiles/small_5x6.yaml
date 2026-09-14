@@ -1,5 +1,7 @@
 name: small_5x6
 
+board: configs/boards/small_5x6.npy
+
 deep_config: configs/deep/small_5x6.yaml
 
 deep_checkpoint:

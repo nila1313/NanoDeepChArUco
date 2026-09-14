@@ -63,6 +63,7 @@ def apply_profile(args):
         profile = yaml.safe_load(f) or {}
 
     required_keys = [
+        "board",
         "nano_executable",
         "deepcharuco_root",
         "deep_checkpoint",

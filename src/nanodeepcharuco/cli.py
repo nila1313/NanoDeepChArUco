@@ -79,8 +79,11 @@ def build_parser() -> argparse.ArgumentParser:
 
     parser.add_argument(
         "--board",
-        required=True,
-        help="ChArUco board definition file.",
+        default=None,
+        help=(
+            "ChArUco board definition file. "
+            "May also be supplied by --profile."
+        ),
     )
 
     parser.add_argument(
@@ -380,6 +383,13 @@ def validate_args(args: argparse.Namespace) -> None:
             raise FileNotFoundError(
                 f"Video not found: {video}"
             )
+
+    if args.board is None:
+        raise ValueError(
+            "Board file is required. "
+            "Provide --board or use a profile "
+            "that defines a board."
+        )
 
     if not Path(args.board).is_file():
         raise FileNotFoundError(
