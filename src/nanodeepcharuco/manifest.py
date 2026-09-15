@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 from pathlib import Path
 
 import yaml
@@ -10,6 +11,43 @@ from nanodeepcharuco.video import (
     build_logical_frame_ids,
     inspect_videos,
 )
+
+
+
+HASH_CHUNK_BYTES = 8 * 1024 * 1024
+
+
+def sha256_file(
+    path: str | Path,
+) -> str:
+    """
+    Return the SHA256 digest of a file.
+
+    The file is streamed in chunks so large calibration
+    videos do not need to be loaded into memory.
+    """
+    file_path = (
+        Path(path)
+        .expanduser()
+        .resolve()
+    )
+
+    digest = hashlib.sha256()
+
+    with file_path.open("rb") as stream:
+        while True:
+            chunk = stream.read(
+                HASH_CHUNK_BYTES
+            )
+
+            if not chunk:
+                break
+
+            digest.update(
+                chunk
+            )
+
+    return digest.hexdigest()
 
 
 def build_input_manifest(
@@ -32,6 +70,12 @@ def build_input_manifest(
             {
                 "camera_index": i,
                 "path": info.path,
+                "file_size_bytes": int(
+                    Path(info.path).stat().st_size
+                ),
+                "sha256": sha256_file(
+                    info.path
+                ),
                 "frame_count": info.frame_count,
                 "width": info.width,
                 "height": info.height,
