@@ -8,6 +8,9 @@ cd "$ROOT"
 PROJECT_ENV="nanodeepcharuco"
 CALIBCAM_ENV="calibcam_baseline_420"
 
+NANO_BUILD_ENV="nanodeepcharuco_nano_build"
+NANO_OPENCV_VERSION="4.13.0"
+
 DEEPCHARUCO_COMMIT="37d569fc582b790843dce408c14556747927711c"
 
 CALIBCAM_REPO="https://github.com/bbo-lab/calibcam.git"
@@ -52,30 +55,20 @@ command -v conda >/dev/null 2>&1 \
 
 OS="$(uname -s)"
 
-if [[ "$OS" == "Darwin" ]]; then
-    command -v brew >/dev/null 2>&1 \
-        || die "Homebrew is required on macOS."
+command -v c++ >/dev/null 2>&1 \
+    || die "A C++ compiler is required."
 
-    for package in cmake git-lfs opencv; do
-        if brew list --versions "$package" >/dev/null 2>&1; then
-            echo "$package: already installed"
-        else
-            echo "Installing $package..."
-            brew install "$package"
-        fi
-    done
-else
-    command -v cmake >/dev/null 2>&1 \
-        || die "cmake is required."
+if ! command -v git-lfs >/dev/null 2>&1; then
+    if [[ "$OS" == "Darwin" ]]; then
+        command -v brew >/dev/null 2>&1 \
+            || die "git-lfs is required. Install it or install Homebrew."
 
-    command -v git-lfs >/dev/null 2>&1 \
-        || die "git-lfs is required."
-
-    if ! pkg-config --exists opencv4 2>/dev/null; then
-        die "OpenCV development libraries are required."
+        echo "Installing git-lfs..."
+        brew install git-lfs
+    else
+        die "git-lfs is required."
     fi
 fi
-
 
 # ----------------------------------------------------------------------
 # Git LFS
@@ -135,23 +128,69 @@ section "5/9 Building native ArUco Nano detector"
 NANO_SRC="$ROOT/third_party/aruco_nano/source"
 NANO_BUILD="$ROOT/third_party/aruco_nano/build"
 
-mkdir -p "$NANO_BUILD"
+if have_conda_env "$NANO_BUILD_ENV"; then
+    echo "Updating pinned Nano build environment: $NANO_BUILD_ENV"
 
-if [[ "$OS" == "Darwin" ]]; then
-    OPENCV_PREFIX="$(brew --prefix opencv)"
-    OPENCV_DIR="$OPENCV_PREFIX/lib/cmake/opencv4"
-
-    cmake \
-        -S "$NANO_SRC" \
-        -B "$NANO_BUILD" \
-        -DOpenCV_DIR="$OPENCV_DIR"
+    conda install -y \
+        -n "$NANO_BUILD_ENV" \
+        --override-channels \
+        -c conda-forge \
+        "libopencv=$NANO_OPENCV_VERSION" \
+        cmake \
+        pkg-config
 else
-    cmake \
-        -S "$NANO_SRC" \
-        -B "$NANO_BUILD"
+    echo "Creating pinned Nano build environment: $NANO_BUILD_ENV"
+
+    conda create -y \
+        -n "$NANO_BUILD_ENV" \
+        --override-channels \
+        -c conda-forge \
+        "libopencv=$NANO_OPENCV_VERSION" \
+        cmake \
+        pkg-config
 fi
 
-cmake --build "$NANO_BUILD" --config Release
+NANO_OPENCV_ACTUAL="$(
+    conda run -n "$NANO_BUILD_ENV" \
+        pkg-config --modversion opencv4 \
+        | awk 'NF {last=$0} END {print last}'
+)"
+
+if [[ "$NANO_OPENCV_ACTUAL" != "$NANO_OPENCV_VERSION" ]]; then
+    die "Unexpected Nano OpenCV version:
+expected: $NANO_OPENCV_VERSION
+actual:   $NANO_OPENCV_ACTUAL"
+fi
+
+NANO_PREFIX="$(
+    conda run -n "$NANO_BUILD_ENV" \
+        sh -c 'printf "%s\n" "$CONDA_PREFIX"' \
+        | awk 'NF {last=$0} END {print last}'
+)"
+
+OPENCV_DIR="$NANO_PREFIX/lib/cmake/opencv4"
+
+[[ -f "$OPENCV_DIR/OpenCVConfig.cmake" ]] \
+    || die "OpenCV CMake configuration not found: $OPENCV_DIR"
+
+echo "Nano OpenCV version : $NANO_OPENCV_ACTUAL"
+echo "Nano OpenCV prefix  : $NANO_PREFIX"
+
+# Remove any old CMake cache so Homebrew/system OpenCV
+# cannot leak into the new native build.
+rm -rf "$NANO_BUILD"
+
+conda run -n "$NANO_BUILD_ENV" \
+    cmake \
+    -S "$NANO_SRC" \
+    -B "$NANO_BUILD" \
+    -DOpenCV_DIR="$OPENCV_DIR" \
+    -DCMAKE_BUILD_TYPE=Release
+
+conda run -n "$NANO_BUILD_ENV" \
+    cmake \
+    --build "$NANO_BUILD" \
+    --config Release
 
 NANO_EXE="$NANO_BUILD/detect_batch"
 
