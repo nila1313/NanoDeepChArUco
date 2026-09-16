@@ -11,6 +11,8 @@ from nanodeepcharuco.calibcam_io import (
     save_calibcam_payload,
 )
 from nanodeepcharuco.video import (
+    canonicalize_decoded_frame,
+    configure_video_capture,
     physical_frame_index,
 )
 
@@ -51,6 +53,7 @@ def run_camera_sequence(
     logical_frame_ids,
     frame_offset: int,
     camera_name: str,
+    canonical_luma: bool = False,
 ) -> CameraDetectionRun:
     """
     Run NanoDeepChArUco over one camera using a shared
@@ -83,6 +86,11 @@ def run_camera_sequence(
         raise RuntimeError(
             f"Could not open video: {video_path}"
         )
+
+    configure_video_capture(
+        cap,
+        canonical_luma=canonical_luma,
+    )
 
     detections_by_index = {}
     frame_indices_by_index = {}
@@ -120,6 +128,11 @@ def run_camera_sequence(
                     f"physical frame {physical_idx} "
                     f"for logical index {logical_idx}"
                 )
+
+            frame = canonicalize_decoded_frame(
+                frame,
+                canonical_luma=canonical_luma,
+            )
 
             tag = (
                 f"{camera_name}_"
@@ -224,6 +237,7 @@ def run_camera_mapped_sequence(
     detector,
     physical_frames_by_index: dict[int, int],
     camera_name: str,
+    canonical_luma: bool = False,
 ) -> CameraDetectionRun:
     """
     Run NanoDeepChArUco using an explicit mapping:
@@ -253,6 +267,11 @@ def run_camera_mapped_sequence(
         raise RuntimeError(
             f"Could not open video: {video_path}"
         )
+
+    configure_video_capture(
+        cap,
+        canonical_luma=canonical_luma,
+    )
 
     detections_by_index = {}
     frame_indices_by_index = {}
@@ -293,6 +312,11 @@ def run_camera_mapped_sequence(
                     f"for detection index "
                     f"{detection_idx}"
                 )
+
+            frame = canonicalize_decoded_frame(
+                frame,
+                canonical_luma=canonical_luma,
+            )
 
             tag = (
                 f"{camera_name}_"

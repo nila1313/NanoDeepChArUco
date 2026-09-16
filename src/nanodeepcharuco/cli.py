@@ -214,6 +214,16 @@ def build_parser() -> argparse.ArgumentParser:
     )
 
     parser.add_argument(
+        "--canonical_luma",
+        action="store_true",
+        help=(
+            "Read the native video luminance plane without "
+            "platform-dependent YUV-to-BGR conversion, then "
+            "expand it to a 3-channel canonical frame."
+        ),
+    )
+
+    parser.add_argument(
         "--auto_sync",
         action="store_true",
         help=(
@@ -591,6 +601,9 @@ def _run_auto_sync_discovery(
             detector=detector,
             physical_frames_by_index=(
                 physical_map
+            ),
+            canonical_luma=(
+                config.canonical_luma
             ),
             camera_name=(
                 f"camera_{cam_idx:03d}"
@@ -1114,6 +1127,9 @@ def main() -> None:
                 detector=detector,
                 logical_frame_ids=logical_ids,
                 frame_offset=frame_offset,
+                canonical_luma=(
+                    config.canonical_luma
+                ),
                 camera_name=(
                     f"camera_{cam_idx:03d}"
                 ),

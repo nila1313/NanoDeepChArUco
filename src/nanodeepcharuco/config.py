@@ -199,6 +199,7 @@ class RunConfig:
     refinenet_checkpoint: str
     deep_config: str
     device: Optional[str]
+    canonical_luma: bool
 
     calibcam_python: Optional[str]
 
@@ -330,6 +331,9 @@ def resolve_config(args) -> RunConfig:
             .resolve()
         ),
         device=args.device,
+        canonical_luma=bool(
+            args.canonical_luma
+        ),
 
         calibcam_python=(
             str(
