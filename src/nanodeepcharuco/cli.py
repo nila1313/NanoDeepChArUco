@@ -29,6 +29,10 @@ from nanodeepcharuco.detection.deep import (
     DeepCharucoDetector,
 )
 
+from nanodeepcharuco.detection.charuco import (
+    expected_charuco_corner_ids,
+)
+
 from nanodeepcharuco.detection.hybrid import (
     NanoDeepCharucoDetector,
 )
@@ -1061,7 +1065,11 @@ def main() -> None:
         device=config.device,
     ).load()
 
-    payloads = []
+    expected_marker_ids = (
+        expected_charuco_corner_ids(
+            config.board
+        )
+    )
 
     if config.auto_sync:
         print()
@@ -1101,66 +1109,6 @@ def main() -> None:
             right_run,
         ]
 
-        for cam_idx, run in enumerate(
-            camera_runs
-        ):
-            detector = NanoDeepCharucoDetector(
-                board_path=config.board,
-                nano_executable=(
-                    config.nano_executable
-                ),
-                deep_detector=deep,
-                work_dir=(
-                    layout.temp_dir
-                    / f"payload_camera_{cam_idx:03d}"
-                ),
-                gamma=config.gamma,
-                deep_self_ransac_px=(
-                    config.deep_self_ransac_px
-                ),
-            )
-
-            output_path = (
-                layout.detection_path(
-                    cam_idx
-                )
-            )
-
-            expected_n_ids = (
-                (detector.board_width - 1)
-                * (detector.board_height - 1)
-            )
-
-            expected_marker_ids = list(
-                range(expected_n_ids)
-            )
-
-            payload = save_camera_run_payload(
-                run,
-                output_path,
-                expected_marker_ids=(
-                    expected_marker_ids
-                ),
-            )
-
-            payloads.append(
-                payload
-            )
-
-            print()
-            print(
-                f"Camera {cam_idx} payload:"
-            )
-            print(
-                summarize_calibcam_payload(
-                    payload
-                )
-            )
-            print(
-                "saved:",
-                output_path,
-            )
-
     else:
         print()
         print(
@@ -1168,7 +1116,6 @@ def main() -> None:
         )
 
         camera_runs = []
-        expected_marker_ids_by_camera = []
 
         for cam_idx, (
             video_path,
@@ -1212,17 +1159,6 @@ def main() -> None:
                 run
             )
 
-            expected_n_ids = (
-                (detector.board_width - 1)
-                * (detector.board_height - 1)
-            )
-
-            expected_marker_ids_by_camera.append(
-                list(
-                    range(expected_n_ids)
-                )
-            )
-
         shared_detection_ids = sorted(
             set.intersection(
                 *[
@@ -1260,42 +1196,36 @@ def main() -> None:
             shared_detection_ids[-1],
         )
 
-        for cam_idx, run in enumerate(
-            camera_runs
-        ):
-            output_path = (
-                layout.detection_path(
-                    cam_idx
-                )
+    for cam_idx, run in enumerate(
+        camera_runs
+    ):
+        output_path = (
+            layout.detection_path(
+                cam_idx
             )
+        )
 
-            payload = save_camera_run_payload(
-                run,
-                output_path,
-                expected_marker_ids=(
-                    expected_marker_ids_by_camera[
-                        cam_idx
-                    ]
-                ),
-            )
+        payload = save_camera_run_payload(
+            run,
+            output_path,
+            expected_marker_ids=(
+                expected_marker_ids
+            ),
+        )
 
-            payloads.append(
+        print()
+        print(
+            f"Camera {cam_idx} payload:"
+        )
+        print(
+            summarize_calibcam_payload(
                 payload
             )
-
-            print()
-            print(
-                f"Camera {cam_idx} payload:"
-            )
-            print(
-                summarize_calibcam_payload(
-                    payload
-                )
-            )
-            print(
-                "saved:",
-                output_path,
-            )
+        )
+        print(
+            "saved:",
+            output_path,
+        )
 
     print()
     print("Detection finished.")
