@@ -11,9 +11,8 @@ from nanodeepcharuco.config import (
 )
 
 from nanodeepcharuco.run_layout import RunLayout
-from nanodeepcharuco.calibcam.backend import (
-    build_calibcam_command,
-    run_calibcam,
+from nanodeepcharuco.pipeline.run_calibration import (
+    run_calibration_pipeline,
 )
 from nanodeepcharuco.manifest import (
     build_input_manifest,
@@ -582,78 +581,12 @@ def main() -> None:
         logical_frame_ids=logical_ids,
     )
 
-    if config.detect_only:
-        print(
-            "detect_only=True; "
-            "CalibCam calibration skipped."
-        )
+    run_calibration_pipeline(
+        config=config,
+        layout=layout,
+        detection_paths=detection_paths,
+    )
 
-    else:
-        cmd = build_calibcam_command(
-            python_executable=config.calibcam_python,
-            videos=config.videos,
-            detection_paths=detection_paths,
-            board=config.board,
-            models=config.models,
-            projection=config.projection,
-            data_path=layout.calibcam_data_path,
-        )
-
-        print()
-        print("=" * 80)
-        print("STARTING CALIBCAM BACKEND")
-        print("=" * 80)
-
-        print(
-            "CalibCam Python:",
-            config.calibcam_python,
-        )
-
-        print(
-            "Detection inputs:",
-            [
-                str(path)
-                for path in detection_paths
-            ],
-        )
-
-        print(
-            "Models:",
-            config.models,
-        )
-
-        print(
-            "Projection:",
-            config.projection,
-        )
-
-        print(
-            "Output:",
-            layout.calibcam_data_path,
-        )
-
-        print()
-        print("Command:")
-        print(
-            " ".join(
-                str(part)
-                for part in cmd
-            )
-        )
-        print()
-
-        run_calibcam(
-            cmd
-        )
-
-        print()
-        print("=" * 80)
-        print("CALIBCAM BACKEND FINISHED")
-        print("=" * 80)
-        print(
-            "Calibration output:",
-            layout.calibcam_data_path,
-        )
 
 
 if __name__ == "__main__":
