@@ -33,8 +33,8 @@ from nanodeepcharuco.detection.charuco import (
     expected_charuco_corner_ids,
 )
 
-from nanodeepcharuco.detection.hybrid import (
-    NanoDeepCharucoDetector,
+from nanodeepcharuco.pipeline.detectors import (
+    build_hybrid_detector,
 )
 
 from nanodeepcharuco.pipeline.sequence import (
@@ -651,20 +651,13 @@ def _run_auto_sync_discovery(
             ),
         ]
     ):
-        detector = NanoDeepCharucoDetector(
-            board_path=config.board,
-            nano_executable=(
-                config.nano_executable
-            ),
+        detector = build_hybrid_detector(
+            config=config,
             deep_detector=deep,
             work_dir=(
                 run_dir
                 / "tmp"
                 / f"autosync_camera_{cam_idx:03d}"
-            ),
-            gamma=config.gamma,
-            deep_self_ransac_px=(
-                config.deep_self_ransac_px
             ),
         )
 
@@ -1126,19 +1119,12 @@ def main() -> None:
                 config.frames_offsets,
             )
         ):
-            detector = NanoDeepCharucoDetector(
-                board_path=config.board,
-                nano_executable=(
-                    config.nano_executable
-                ),
+            detector = build_hybrid_detector(
+                config=config,
                 deep_detector=deep,
                 work_dir=(
                     layout.temp_dir
                     / f"camera_{cam_idx:03d}"
-                ),
-                gamma=config.gamma,
-                deep_self_ransac_px=(
-                    config.deep_self_ransac_px
                 ),
             )
 
