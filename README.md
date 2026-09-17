@@ -22,7 +22,7 @@ DeepChArUco recovery
    ↓
 shared stereo detections
    ↓
-optional automatic synchronization
+automatic trusted synchronization
    ↓
 CalibCam detection YAML
    ↓
@@ -92,7 +92,61 @@ conda activate nanodeepcharuco
 - `DICT_4X4_50`
 - 36 ChArUco corner IDs
 
-## Full calibration with known frame offsets
+## Default stereo calibration
+
+For a normal two-camera run, NanoDeepChArUco automatically estimates
+temporal synchronization and keeps only trusted stable synchronization
+regions.
+
+Canonical native-luminance decoding is enabled by default for
+cross-platform reproducibility.
+
+Example:
+
+```bash
+RUN="runs/auto_sync_run"
+mkdir -p "$RUN"
+
+nanodeepcharuco \
+  --videos /path/to/left.MP4 /path/to/right.MP4 \
+  --profile small_5x6 \
+  --frames_start 0 \
+  --frames_end 2640 \
+  --frames_step 20 \
+  --sync_offsets -3 -2 -1 0 1 2 3 \
+  --sync_frame_step 20 \
+  --sync_window_size 400 \
+  --sync_window_step 200 \
+  --sync_min_inlier_ratio 0.20 \
+  --sync_min_ratio_gap 0.05 \
+  --sync_min_persistence 2 \
+  --sync_max_gap_frames 400 \
+  --models omnidir omnidir \
+  --projection perspective \
+  --data_path "$RUN" \
+  2>&1 | tee "$RUN/full_pipeline.log"
+```
+
+No `--auto_sync` flag is required for a normal two-video run.
+
+The legacy `--auto_sync` flag is still accepted for backward
+compatibility.
+
+Automatic synchronization evaluates candidate offsets, keeps trusted
+windows, combines persistent evidence into stable segments, and gives
+both cameras shared logical detection IDs.
+
+For example:
+
+```text
+offset +1: Left(t) ↔ Right(t+1)
+offset -1: Left(t) ↔ Right(t-1)
+```
+
+## Fixed-offset expert mode
+
+If a validated frame offset is already known and should be forced, use
+fixed synchronization.
 
 Example:
 
@@ -106,6 +160,7 @@ nanodeepcharuco \
   --frames_start 0 \
   --frames_end 2640 \
   --frames_step 20 \
+  --fixed_sync \
   --frames_offsets 0 1 \
   --models omnidir omnidir \
   --projection perspective \
@@ -125,43 +180,31 @@ In general:
 physical_frame[camera] = logical_frame + frame_offset[camera]
 ```
 
-## Full calibration with automatic synchronization
+Explicit `--frames_offsets` also preserve the historical fixed-offset
+behavior even if `--fixed_sync` is omitted.
 
-Example:
+## Portable video decoding
+
+Canonical luminance decoding is enabled by default for CLI runs.
+
+This reads the native video luminance plane and avoids platform-dependent
+YUV-to-BGR conversion before expanding the frame to the three-channel format
+expected by the detector.
+
+The default portable behavior can also be requested explicitly with:
 
 ```bash
-RUN="runs/auto_sync_run"
-mkdir -p "$RUN"
-
-nanodeepcharuco \
-  --videos /path/to/left.MP4 /path/to/right.MP4 \
-  --profile small_5x6 \
-  --frames_start 0 \
-  --frames_end 2160 \
-  --frames_step 20 \
-  --frames_offsets 0 0 \
-  --auto_sync \
-  --sync_offsets -3 -2 -1 0 1 2 3 \
-  --sync_frame_step 20 \
-  --sync_window_size 400 \
-  --sync_window_step 200 \
-  --sync_min_inlier_ratio 0.20 \
-  --sync_min_ratio_gap 0.05 \
-  --sync_min_persistence 2 \
-  --sync_max_gap_frames 400 \
-  --models omnidir omnidir \
-  --projection perspective \
-  --data_path "$RUN" \
-  2>&1 | tee "$RUN/full_pipeline.log"
+--canonical_luma
 ```
 
-Automatic synchronization evaluates candidate offsets, keeps trusted windows, combines persistent windows into stable segments, and gives both cameras the same logical detection IDs.
+For legacy comparison only, it can be disabled with:
 
-A negative offset such as `-1` means:
-
-```text
-Left(t) ↔ Right(t-1)
+```bash
+--no_canonical_luma
 ```
+
+The legacy decoding path is not the recommended mode for reproducible
+cross-platform runs.
 
 ## Detection only
 
@@ -172,10 +215,13 @@ nanodeepcharuco \
   --videos /path/to/left.MP4 /path/to/right.MP4 \
   --profile small_5x6 \
   --frames_step 20 \
-  --frames_offsets 0 1 \
   --detect_only \
   --data_path runs/detection_only
 ```
+
+For two-camera input, detection-only mode still uses the default automatic
+trusted synchronization. Use `--fixed_sync --frames_offsets ...` only when
+a fixed alignment is intentionally required.
 
 ## Detector routing
 
@@ -272,30 +318,111 @@ or with:
 export NANODEEPCHARUCO_CALIBCAM_PYTHON=/path/to/python
 ```
 
-## Verified regression results
+## Cross-platform validation
 
-### Pair 01: known offset
+The current portable pipeline has been validated end-to-end on:
 
 ```text
-Left(t) ↔ Right(t+1)
-
-final median reprojection residuals:
-camera 0 ≈ 0.20 px
-camera 1 ≈ 0.31 px
+macOS ARM
+Linux x86-64
 ```
 
-The complete NanoDeepChArUco → CalibCam pipeline finished successfully.
+using both built-in board profiles.
 
-### Pair 03: automatic synchronization
+### Pair 01 — `small_5x6`
 
-Automatic synchronization selected:
+Dataset:
+
+```text
+20230613/4pi/030_checkerboard_1
+```
+
+Automatic synchronization selected the trusted `+1` alignment and produced:
+
+```text
+111 synchronized stereo pairs
+synchronized range: 400 to 2600
+
+final median reprojection residuals:
+camera 0: 0.23 px
+camera 1: 0.36 px
+```
+
+Mac and Linux produced identical synchronization decisions, synchronized
+frame mappings, ChArUco IDs, finite-value masks, and valid-corner masks.
+
+The maximum cross-platform detected-corner difference was approximately:
+
+```text
+0.000122 px
+```
+
+The final stereo calibrations were practically equivalent.
+
+Full report:
+
+```text
+reports/PAIR01_PORTABILITY_VALIDATION.md
+```
+
+### Pair 02 — `large_7x7`
+
+Dataset:
+
+```text
+20230613/4pi/040_checkerboard_2
+```
+
+Automatic synchronization produced two trusted `+1` stable regions and:
+
+```text
+243 synchronized stereo pairs
+synchronized range: 420 to 8680
+
+final median reprojection residuals:
+camera 0: 0.88 px
+camera 1: 0.77 px
+```
+
+Mac and Linux again produced identical synchronization decisions,
+synchronized frame mappings, ChArUco IDs, finite-value masks, and
+valid-corner masks.
+
+Detected-corner differences remained sub-millipixel and the final stereo
+calibrations were practically equivalent.
+
+Full report:
+
+```text
+reports/PAIR02_PORTABILITY_VALIDATION.md
+```
+
+### Portability statement
+
+The supported wording for the validated pipeline is:
+
+> Numerically reproducible across the tested platforms, with negligible
+> architecture-dependent floating-point differences.
+
+The implementation is **not** claimed to be universally bit-for-bit
+deterministic across CPU architectures.
+
+Together, Pair 01 and Pair 02 validate both built-in profiles:
+
+```text
+small_5x6
+large_7x7
+```
+
+### Additional synchronization regression
+
+Pair 03 also completed automatic synchronization and final CalibCam
+calibration successfully:
 
 ```text
 stable offset = -1
 105 synchronized stereo pairs
 ```
-
-The synchronization reports were written and the final CalibCam multi-camera calibration completed successfully.
 
 ## Notes
 

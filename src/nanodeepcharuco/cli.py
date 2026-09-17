@@ -112,7 +112,8 @@ def build_parser() -> argparse.ArgumentParser:
         default=None,
         help=(
             "Per-camera frame offsets using the same user-facing "
-            "style as CalibCam."
+            "style as CalibCam. Supplying explicit offsets without "
+            "--auto_sync selects fixed synchronization."
         ),
     )
 
@@ -213,22 +214,41 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
 
-    parser.add_argument(
+    luma_group = parser.add_mutually_exclusive_group()
+
+    luma_group.add_argument(
         "--canonical_luma",
+        dest="canonical_luma",
         action="store_true",
-        help=(
-            "Read the native video luminance plane without "
-            "platform-dependent YUV-to-BGR conversion, then "
-            "expand it to a 3-channel canonical frame."
-        ),
+        help="Use canonical native-luminance decoding for cross-platform reproducibility. This is the default.",
     )
+
+    luma_group.add_argument(
+        "--no_canonical_luma",
+        dest="canonical_luma",
+        action="store_false",
+        help="Use legacy platform-dependent BGR video decoding instead of canonical luminance.",
+    )
+
+    parser.set_defaults(canonical_luma=True)
 
     parser.add_argument(
         "--auto_sync",
         action="store_true",
         help=(
-            "Automatically estimate piecewise stereo "
-            "frame synchronization."
+            "Explicitly enable automatic piecewise stereo "
+            "synchronization. This is the default for a two-video "
+            "run when --frames_offsets is omitted."
+        ),
+    )
+
+    parser.add_argument(
+        "--fixed_sync",
+        action="store_true",
+        help=(
+            "Use fixed per-camera synchronization instead of "
+            "automatic synchronization. Frame offsets are taken "
+            "from --frames_offsets; omitted offsets default to zero."
         ),
     )
 
@@ -322,6 +342,44 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
+def resolve_sync_mode(
+    args: argparse.Namespace,
+) -> argparse.Namespace:
+    """
+    Resolve the user-facing synchronization mode.
+
+    Two-video runs default to automatic synchronization when no
+    explicit frame offsets or synchronization mode are supplied.
+
+    Explicit frame offsets preserve the historical fixed-offset
+    behavior unless --auto_sync is requested.
+    """
+    if args.auto_sync and args.fixed_sync:
+        raise ValueError(
+            "--auto_sync and --fixed_sync cannot be used together."
+        )
+
+    if args.fixed_sync:
+        args.auto_sync = False
+
+    elif not args.auto_sync:
+        args.auto_sync = (
+            len(args.videos) == 2
+            and args.frames_offsets is None
+        )
+
+    if (
+        args.auto_sync
+        and args.frames_offsets is None
+    ):
+        args.frames_offsets = [
+            0
+            for _ in args.videos
+        ]
+
+    return args
+
+
 def validate_args(args: argparse.Namespace) -> None:
     if len(args.videos) < 1:
         raise ValueError("At least one input video is required.")
@@ -348,9 +406,15 @@ def validate_args(args: argparse.Namespace) -> None:
                 "two videos."
             )
 
+        auto_sync_offsets = (
+            args.frames_offsets
+            if args.frames_offsets is not None
+            else [0] * len(args.videos)
+        )
+
         if any(
             int(offset) != 0
-            for offset in args.frames_offsets
+            for offset in auto_sync_offsets
         ):
             raise ValueError(
                 "--auto_sync currently requires "
@@ -907,6 +971,7 @@ def main() -> None:
 
     args = apply_profile(args)
     args = apply_runtime_backend(args)
+    args = resolve_sync_mode(args)
 
     validate_args(args)
 
