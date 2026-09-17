@@ -25,29 +25,8 @@ from nanodeepcharuco.video import (
     build_logical_frame_ids,
 )
 
-from nanodeepcharuco.detection.deep import (
-    DeepCharucoDetector,
-)
-
-from nanodeepcharuco.detection.charuco import (
-    expected_charuco_corner_ids,
-)
-
-from nanodeepcharuco.pipeline.sequence import (
-    save_camera_run_payload,
-)
-
-from nanodeepcharuco.pipeline.fixed_sync import (
-    run_fixed_sync_detection,
-)
-
-from nanodeepcharuco.pipeline.auto_sync import (
-    run_auto_sync_discovery,
-    resolve_auto_sync_runs,
-)
-
-from nanodeepcharuco.calibcam_io import (
-    summarize_calibcam_payload,
+from nanodeepcharuco.pipeline.run_detection import (
+    run_detection_pipeline,
 )
 
 
@@ -596,112 +575,12 @@ def main() -> None:
         int(logical_ids[-1]),
     )
 
-    deep = DeepCharucoDetector(
-        deepcharuco_root=(
-            config.deepcharuco_root
-        ),
-        deep_checkpoint=(
-            config.deep_checkpoint
-        ),
-        refinenet_checkpoint=(
-            config.refinenet_checkpoint
-        ),
-        config_path=(
-            config.deep_config
-        ),
-        device=config.device,
-    ).load()
-
-    expected_marker_ids = (
-        expected_charuco_corner_ids(
-            config.board
-        )
+    detection_paths = run_detection_pipeline(
+        config=config,
+        layout=layout,
+        video_infos=video_infos,
+        logical_frame_ids=logical_ids,
     )
-
-    if config.auto_sync:
-        print()
-        print(
-            "auto_sync     : enabled"
-        )
-
-        (
-            left_discovery_run,
-            right_discovery_run,
-        ) = run_auto_sync_discovery(
-            config=config,
-            run_dir=layout.metadata_dir,
-            video_infos=video_infos,
-            deep=deep,
-        )
-
-        (
-            left_run,
-            right_run,
-            _segments,
-            _window_results,
-        ) = resolve_auto_sync_runs(
-            config=config,
-            run_dir=layout.metadata_dir,
-            calibration_frame_ids=logical_ids,
-            left_discovery_run=(
-                left_discovery_run
-            ),
-            right_discovery_run=(
-                right_discovery_run
-            ),
-        )
-
-        camera_runs = [
-            left_run,
-            right_run,
-        ]
-
-    else:
-        print()
-        print(
-            "auto_sync     : disabled"
-        )
-
-        camera_runs = run_fixed_sync_detection(
-            config=config,
-            logical_frame_ids=logical_ids,
-            deep_detector=deep,
-            temp_dir=layout.temp_dir,
-        )
-
-    for cam_idx, run in enumerate(
-        camera_runs
-    ):
-        output_path = (
-            layout.detection_path(
-                cam_idx
-            )
-        )
-
-        payload = save_camera_run_payload(
-            run,
-            output_path,
-            expected_marker_ids=(
-                expected_marker_ids
-            ),
-        )
-
-        print()
-        print(
-            f"Camera {cam_idx} payload:"
-        )
-        print(
-            summarize_calibcam_payload(
-                payload
-            )
-        )
-        print(
-            "saved:",
-            output_path,
-        )
-
-    print()
-    print("Detection finished.")
 
     if config.detect_only:
         print(
@@ -710,14 +589,6 @@ def main() -> None:
         )
 
     else:
-        detection_paths = [
-            layout.detection_path(
-                cam_idx
-            )
-            for cam_idx
-            in range(len(config.videos))
-        ]
-
         cmd = build_calibcam_command(
             python_executable=config.calibcam_python,
             videos=config.videos,
