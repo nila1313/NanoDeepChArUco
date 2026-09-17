@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import argparse
-import subprocess
 from pathlib import Path
 
 from nanodeepcharuco.config import (
@@ -12,6 +11,10 @@ from nanodeepcharuco.config import (
 )
 
 from nanodeepcharuco.run_layout import RunLayout
+from nanodeepcharuco.calibcam.backend import (
+    build_calibcam_command,
+    run_calibcam,
+)
 from nanodeepcharuco.manifest import (
     build_input_manifest,
     save_input_manifest,
@@ -1312,28 +1315,15 @@ def main() -> None:
             in range(len(config.videos))
         ]
 
-        cmd = [
-            config.calibcam_python,
-            "-m",
-            "calibcam",
-            "--videos",
-            *config.videos,
-            "--detection",
-            *[
-                str(path)
-                for path in detection_paths
-            ],
-            "--board",
-            config.board,
-            "--calibration_single",
-            "--calibration_multi",
-            "--models",
-            *config.models,
-            "--projection",
-            config.projection,
-            "--data_path",
-            str(layout.calibcam_data_path),
-        ]
+        cmd = build_calibcam_command(
+            python_executable=config.calibcam_python,
+            videos=config.videos,
+            detection_paths=detection_paths,
+            board=config.board,
+            models=config.models,
+            projection=config.projection,
+            data_path=layout.calibcam_data_path,
+        )
 
         print()
         print("=" * 80)
@@ -1378,9 +1368,8 @@ def main() -> None:
         )
         print()
 
-        subprocess.run(
-            cmd,
-            check=True,
+        run_calibcam(
+            cmd
         )
 
         print()
