@@ -362,7 +362,7 @@ The final stereo calibrations were practically equivalent.
 Full report:
 
 ```text
-reports/PAIR01_PORTABILITY_VALIDATION.md
+docs/validation/PAIR01_PORTABILITY_VALIDATION.md
 ```
 
 ### Pair 02 — `large_7x7`
@@ -394,7 +394,7 @@ calibrations were practically equivalent.
 Full report:
 
 ```text
-reports/PAIR02_PORTABILITY_VALIDATION.md
+docs/validation/PAIR02_PORTABILITY_VALIDATION.md
 ```
 
 ### Portability statement

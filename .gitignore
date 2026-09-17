@@ -10,8 +10,7 @@ build/
 dist/
 *.egg-info/
 
-runs/*
-!runs/.gitkeep
+runs/
 
 models/*
 !models/README.md
