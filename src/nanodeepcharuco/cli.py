@@ -7,10 +7,11 @@ from pathlib import Path
 from nanodeepcharuco.config import (
     apply_profile,
     apply_runtime_backend,
-    prepare_run_directory,
     resolve_config,
     save_resolved_config,
 )
+
+from nanodeepcharuco.run_layout import RunLayout
 from nanodeepcharuco.manifest import (
     build_input_manifest,
     save_input_manifest,
@@ -976,10 +977,15 @@ def main() -> None:
     validate_args(args)
 
     config = resolve_config(args)
-    run_dir = prepare_run_directory(config)
+
+    layout = RunLayout.from_data_path(
+        config.data_path
+    )
+    layout.prepare()
+
     config_path = save_resolved_config(
         config,
-        run_dir,
+        layout.metadata_dir,
     )
 
     manifest, _ = build_input_manifest(
@@ -988,7 +994,7 @@ def main() -> None:
 
     manifest_path = save_input_manifest(
         manifest,
-        run_dir,
+        layout.metadata_dir,
     )
 
     print("NanoDeepChArUco")
@@ -1065,7 +1071,7 @@ def main() -> None:
             right_discovery_run,
         ) = _run_auto_sync_discovery(
             config=config,
-            run_dir=run_dir,
+            run_dir=layout.metadata_dir,
             video_infos=video_infos,
             deep=deep,
         )
@@ -1077,7 +1083,7 @@ def main() -> None:
             _window_results,
         ) = _resolve_auto_sync_runs(
             config=config,
-            run_dir=run_dir,
+            run_dir=layout.metadata_dir,
             calibration_frame_ids=logical_ids,
             left_discovery_run=(
                 left_discovery_run
@@ -1102,8 +1108,7 @@ def main() -> None:
                 ),
                 deep_detector=deep,
                 work_dir=(
-                    run_dir
-                    / "tmp"
+                    layout.temp_dir
                     / f"payload_camera_{cam_idx:03d}"
                 ),
                 gamma=config.gamma,
@@ -1113,8 +1118,9 @@ def main() -> None:
             )
 
             output_path = (
-                run_dir
-                / f"detection_{cam_idx:03d}.yml"
+                layout.detection_path(
+                    cam_idx
+                )
             )
 
             expected_n_ids = (
@@ -1177,8 +1183,7 @@ def main() -> None:
                 ),
                 deep_detector=deep,
                 work_dir=(
-                    run_dir
-                    / "tmp"
+                    layout.temp_dir
                     / f"camera_{cam_idx:03d}"
                 ),
                 gamma=config.gamma,
@@ -1256,8 +1261,9 @@ def main() -> None:
             camera_runs
         ):
             output_path = (
-                run_dir
-                / f"detection_{cam_idx:03d}.yml"
+                layout.detection_path(
+                    cam_idx
+                )
             )
 
             payload = save_camera_run_payload(
@@ -1298,19 +1304,10 @@ def main() -> None:
         )
 
     else:
-        calibcam_output = (
-            run_dir
-            / "calibcam_output"
-        )
-
-        calibcam_output.mkdir(
-            parents=True,
-            exist_ok=True,
-        )
-
         detection_paths = [
-            run_dir
-            / f"detection_{cam_idx:03d}.yml"
+            layout.detection_path(
+                cam_idx
+            )
             for cam_idx
             in range(len(config.videos))
         ]
@@ -1335,7 +1332,7 @@ def main() -> None:
             "--projection",
             config.projection,
             "--data_path",
-            str(calibcam_output),
+            str(layout.calibcam_data_path),
         ]
 
         print()
@@ -1368,7 +1365,7 @@ def main() -> None:
 
         print(
             "Output:",
-            calibcam_output,
+            layout.calibcam_data_path,
         )
 
         print()
@@ -1392,7 +1389,7 @@ def main() -> None:
         print("=" * 80)
         print(
             "Calibration output:",
-            calibcam_output,
+            layout.calibcam_data_path,
         )
 
 
