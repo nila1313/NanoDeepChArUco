@@ -347,17 +347,6 @@ def resolve_config(args) -> RunConfig:
     )
 
 
-def prepare_run_directory(config: RunConfig) -> Path:
-    run_dir = Path(config.data_path)
-
-    run_dir.mkdir(
-        parents=True,
-        exist_ok=True,
-    )
-
-    return run_dir
-
-
 def save_resolved_config(
     config: RunConfig,
     run_dir: Path,

@@ -245,34 +245,53 @@ DEEP_SELF
 
 ## Output structure
 
-A normal full run contains:
+NanoDeepChArUco uses the supplied `--data_path` as the CalibCam data
+directory.
+
+CalibCam-compatible detection files and official CalibCam calibration
+outputs are written directly at the `data_path` root. NanoDeepChArUco-specific
+metadata is kept separately under `nanodeepcharuco/`.
+
+A normal full stereo run contains:
 
 ```text
-run/
-├── resolved_config.yml
-├── input_manifest.yml
+data_path/
 ├── detection_000.yml
 ├── detection_001.yml
-├── full_pipeline.log
-└── calibcam_output/
-    ├── calibration_single_000.yml
-    ├── calibration_single_001.yml
-    ├── joinedsingles_calibraton.yml
-    ├── multicam_calibration.yml
-    ├── multicam_calibration.npy
-    ├── multicam_calibration.mat
-    └── multicam_calibration_board_positions.yml
+├── calibration_single_000.yml
+├── calibration_single_001.yml
+├── joinedsingles_calibraton.yml
+├── joinedsingles_calibraton.npy
+├── joinedsingles_calibraton.mat
+├── multicam_calibration.yml
+├── multicam_calibration.npy
+├── multicam_calibration.mat
+├── multicam_calibration_board_positions.yml
+├── detections_cam_000.svg
+├── detections_cam_001.svg
+└── nanodeepcharuco/
+    ├── resolved_config.yml
+    ├── input_manifest.yml
+    └── tmp/
 ```
 
-Automatic-sync runs additionally contain:
+Automatic-synchronization runs additionally store synchronization metadata
+inside the NanoDeepChArUco namespace:
 
 ```text
-sync_window_results.yml
-sync_segments.yml
-sync_pairs.yml
+data_path/
+└── nanodeepcharuco/
+    ├── sync_window_results.yml
+    ├── sync_segments.yml
+    └── sync_pairs.yml
 ```
 
-`full_pipeline.log` is created by the example commands through `tee`.
+This separation keeps the public CalibCam file layout compatible with
+official CalibCam while preventing NanoDeepChArUco-specific metadata from
+being mixed with CalibCam outputs.
+
+`full_pipeline.log` is not created automatically by the package. The example
+commands create it with `tee` when a persistent terminal log is desired.
 
 ## Verified dependency revisions
 
@@ -362,7 +381,7 @@ The final stereo calibrations were practically equivalent.
 Full report:
 
 ```text
-reports/PAIR01_PORTABILITY_VALIDATION.md
+docs/validation/PAIR01_PORTABILITY_VALIDATION.md
 ```
 
 ### Pair 02 — `large_7x7`
@@ -394,7 +413,7 @@ calibrations were practically equivalent.
 Full report:
 
 ```text
-reports/PAIR02_PORTABILITY_VALIDATION.md
+docs/validation/PAIR02_PORTABILITY_VALIDATION.md
 ```
 
 ### Portability statement

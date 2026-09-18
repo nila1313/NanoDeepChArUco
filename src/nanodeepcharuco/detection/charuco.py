@@ -60,6 +60,32 @@ def load_board_parameters(
     return params
 
 
+def expected_charuco_corner_ids(
+    board_path: str | Path,
+) -> list[int]:
+    """Return the complete ChArUco corner ID set for a board."""
+
+    params = load_board_parameters(
+        board_path
+    )
+
+    board_width = int(
+        params["boardWidth"]
+    )
+    board_height = int(
+        params["boardHeight"]
+    )
+
+    corner_count = (
+        (board_width - 1)
+        * (board_height - 1)
+    )
+
+    return list(
+        range(corner_count)
+    )
+
+
 def build_charuco_board(
     board_path: str | Path,
 ):
