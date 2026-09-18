@@ -1,9 +1,10 @@
 # Model Assets
 
-Model checkpoints are intentionally not stored in Git.
+Model checkpoints are tracked using Git LFS rather than ordinary Git blobs.
 
-Expected local layout:
+Expected layout:
 
+```text
 models/
 ├── deepcharuco/
 │   ├── large_7x7/
@@ -12,6 +13,7 @@ models/
 │       └── detector.ckpt
 └── refinenet/
     └── refinenet.ckpt
+```
 
 Profiles in `configs/profiles/` reference these paths.
 
@@ -28,3 +30,11 @@ Verified model compatibility:
   - detector output head: 21 channels
 
 The RefineNet checkpoint is shared by both profiles.
+
+After cloning, retrieve the checkpoint contents with:
+
+```bash
+git lfs pull
+```
+
+The repository `setup.sh` script performs this step automatically.

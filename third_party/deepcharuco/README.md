@@ -1,9 +1,30 @@
 # DeepChArUco
 
-DeepChArUco is an external source dependency and is not stored in this repository.
+DeepChArUco is tracked as a pinned Git submodule.
 
-Place the verified DeepChArUco source tree at:
+The verified source tree is located at:
 
-third_party/deepcharuco/source
+```text
+third_party/deepcharuco/upstream
+```
 
-NanoDeepChArUco loads the DeepChArUco inference modules from this location.
+NanoDeepChArUco loads the inference modules from:
+
+```text
+third_party/deepcharuco/upstream/src
+```
+
+Pinned revision:
+
+```text
+37d569fc582b790843dce408c14556747927711c
+```
+
+Initialize the dependency with:
+
+```bash
+git submodule update --init --recursive
+```
+
+The repository `setup.sh` script performs this initialization and verifies
+the pinned revision automatically.

@@ -1,9 +1,22 @@
 # ArUco Nano
 
-ArUco Nano is an external native dependency and is not stored in this repository.
+The ArUco Nano source used by NanoDeepChArUco is stored under:
 
-Build or provide the platform-specific executable at:
+```text
+third_party/aruco_nano/source
+```
 
-third_party/aruco_nano/detect_batch
+The repository `setup.sh` script builds the platform-specific executable at:
 
-The executable must be runnable by the current user.
+```text
+third_party/aruco_nano/build/detect_batch
+```
+
+The build directory is generated locally and is intentionally excluded from
+version control.
+
+Source provenance and verified hashes are recorded in:
+
+```text
+third_party/aruco_nano/provenance.json
+```
