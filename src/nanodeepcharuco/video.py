@@ -7,6 +7,83 @@ import cv2
 import numpy as np
 
 
+def configure_video_capture(
+    cap: cv2.VideoCapture,
+    canonical_luma: bool = False,
+) -> None:
+    """
+    Configure video decoding for reproducible frame input.
+
+    When canonical_luma is enabled, disable OpenCV's
+    platform-dependent YUV-to-BGR conversion and request
+    the native luminance plane from the FFmpeg backend.
+    """
+
+    if not canonical_luma:
+        return
+
+    ok = cap.set(
+        cv2.CAP_PROP_CONVERT_RGB,
+        0,
+    )
+
+    if not ok:
+        raise RuntimeError(
+            "Could not disable automatic RGB conversion "
+            "for canonical luminance decoding."
+        )
+
+
+def canonicalize_decoded_frame(
+    frame: np.ndarray,
+    canonical_luma: bool = False,
+) -> np.ndarray:
+    """
+    Convert a native luminance frame into a deterministic
+    3-channel uint8 image expected by the existing detector.
+
+    With canonical_luma disabled, return the original frame.
+    """
+
+    if not canonical_luma:
+        return frame
+
+    if frame is None:
+        raise ValueError(
+            "Decoded frame is None."
+        )
+
+    frame = np.asarray(frame)
+
+    if frame.ndim == 2:
+        gray = frame
+
+    elif (
+        frame.ndim == 3
+        and frame.shape[2] == 1
+    ):
+        gray = frame[:, :, 0]
+
+    else:
+        raise RuntimeError(
+            "Canonical luminance mode expected a "
+            "single-channel decoded frame, got shape "
+            f"{frame.shape}."
+        )
+
+    if gray.dtype != np.uint8:
+        raise RuntimeError(
+            "Canonical luminance mode expected uint8 "
+            f"pixels, got {gray.dtype}."
+        )
+
+    return np.repeat(
+        gray[:, :, None],
+        3,
+        axis=2,
+    )
+
+
 @dataclass(frozen=True)
 class VideoInfo:
     path: str

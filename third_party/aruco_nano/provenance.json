@@ -1,0 +1,12 @@
+{
+  "purpose": "Replacement JPEG-directory interface for NanoDeepCharuco",
+  "historical_binary_equivalence": "not established",
+  "aruco_nano_revision": "961b18b747d64cc3692c570dff35334c098b9e62",
+  "sha256": {
+    "aruco_nano.h": "08068c9ad4057ed88d4b0d25503f0ab031c8d3fb29e39dcd2274bc90331a6dca",
+    "json.hpp": "44b4cba46af923a0f00bef52b6291d7d2ea37f32f5bafce4648a33e24c1ab874",
+    "main.cpp": "87fa1d15c682e1427b5de9e180e091a48363541691d51bd8553ad44d9a640345",
+    "CMakeLists.txt": "3a41cb0a91d73e653827be020fd26f20ee554b9ca5e53e62d2e086de3f20261a",
+    "build/detect_batch": "da9d666dc7bfd4351e2a6a9d65efd2b22344f41198ac47d688c2cfa26500a1da"
+  }
+}

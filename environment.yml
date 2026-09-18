@@ -1,0 +1,21 @@
+name: nanodeepcharuco
+
+channels:
+  - conda-forge
+
+dependencies:
+  - python=3.10.21
+  - pip
+  - numpy=1.23.5
+  - numba=0.56.4
+  - pyyaml=6.0.3
+  - setuptools=80.10.2
+
+  - pip:
+      - opencv-contrib-python-headless==4.11.0.86
+      - torch==2.0.1
+      - pytorch-lightning==1.9.3
+      - torchmetrics==0.11.1
+      - pydantic==2.13.5
+      - lightning-utilities==0.15.3
+      - -e .

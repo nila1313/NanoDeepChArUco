@@ -178,7 +178,7 @@ class DeepCharucoDetector:
                 input_width,
                 input_height,
             ),
-            interpolation=cv2.INTER_AREA,
+            interpolation=cv2.INTER_LINEAR_EXACT,
         )
 
         keypoints, _ = self._infer_image(

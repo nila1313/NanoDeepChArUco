@@ -1,0 +1,19 @@
+# Pair 2 / original DeepCharuco board
+board_name: DICT_4X4_50
+row_count: 7
+col_count: 7
+square_len: 1.0
+marker_len: 0.7
+
+input_size: [320, 240]
+
+bs_train: 8
+bs_train_rn: 64
+bs_val: 8
+bs_val_rn: 128
+num_workers: 0
+
+train_labels: 'coco_subset/train.json'
+val_labels: 'coco_subset/val.json'
+train_images: 'coco_subset/train/'
+val_images: 'coco_subset/val/'
