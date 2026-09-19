@@ -5,6 +5,7 @@ from typing import Sequence
 
 from nanodeepcharuco.calibcam.backend import (
     build_calibcam_command,
+    build_two_stage_extrinsics_command,
     run_calibcam,
 )
 from nanodeepcharuco.run_layout import RunLayout
@@ -25,17 +26,39 @@ def run_calibration_pipeline(
         )
         return
 
-    command = build_calibcam_command(
-        python_executable=(
-            config.calibcam_python
-        ),
-        videos=config.videos,
-        detection_paths=detection_paths,
-        board=config.board,
-        models=config.models,
-        projection=config.projection,
-        data_path=layout.calibcam_data_path,
+    calibration_single_paths = getattr(
+        config,
+        "calibration_single_paths",
+        None,
     )
+
+    if calibration_single_paths is None:
+        command = build_calibcam_command(
+            python_executable=(
+                config.calibcam_python
+            ),
+            videos=config.videos,
+            detection_paths=detection_paths,
+            board=config.board,
+            models=config.models,
+            projection=config.projection,
+            data_path=layout.calibcam_data_path,
+        )
+    else:
+        command = build_two_stage_extrinsics_command(
+            python_executable=(
+                config.calibcam_python
+            ),
+            videos=config.videos,
+            detection_paths=detection_paths,
+            board=config.board,
+            calibration_single_paths=(
+                calibration_single_paths
+            ),
+            models=config.models,
+            projection=config.projection,
+            data_path=layout.calibcam_data_path,
+        )
 
     print()
     print("=" * 80)

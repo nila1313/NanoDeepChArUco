@@ -76,6 +76,17 @@ def build_parser() -> argparse.ArgumentParser:
     )
 
     parser.add_argument(
+        "--calibration_single",
+        nargs="+",
+        default=None,
+        help=(
+            "Existing single-camera CalibCam calibration YAMLs. "
+            "With two videos, enables fixed-intrinsics, "
+            "extrinsics-only calibration."
+        ),
+    )
+
+    parser.add_argument(
         "--data_path",
         required=True,
         help="Output directory for detections and calibration results.",
@@ -335,8 +346,36 @@ def validate_args(args: argparse.Namespace) -> None:
                 "--frames_offsets must contain one value per video."
             )
 
+    calibration_single = getattr(
+        args,
+        "calibration_single",
+        None,
+    )
+
+    if calibration_single is not None:
+        if len(args.videos) != 2:
+            raise ValueError(
+                "--calibration_single currently requires "
+                "exactly two videos."
+            )
+
+        if len(calibration_single) != len(args.videos):
+            raise ValueError(
+                "--calibration_single must contain one "
+                "calibration file per video."
+            )
+
     if args.models is not None:
-        if len(args.models) != len(args.videos):
+        if calibration_single is not None:
+            if len(args.models) not in (
+                1,
+                len(args.videos),
+            ):
+                raise ValueError(
+                    "Two-stage calibration accepts either "
+                    "one shared model or one model per video."
+                )
+        elif len(args.models) != len(args.videos):
             raise ValueError(
                 "--models must contain one value per video."
             )

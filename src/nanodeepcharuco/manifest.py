@@ -106,6 +106,38 @@ def build_input_manifest(
         },
     }
 
+    calibration_single_paths = getattr(
+        config,
+        "calibration_single_paths",
+        None,
+    )
+
+    if calibration_single_paths is not None:
+        manifest["calibration_single_inputs"] = [
+            {
+                "camera_index": camera_index,
+                "path": str(
+                    Path(calibration_path)
+                    .expanduser()
+                    .resolve()
+                ),
+                "file_size_bytes": int(
+                    Path(calibration_path)
+                    .expanduser()
+                    .resolve()
+                    .stat()
+                    .st_size
+                ),
+                "sha256": sha256_file(
+                    calibration_path
+                ),
+            }
+            for camera_index, calibration_path
+            in enumerate(
+                calibration_single_paths
+            )
+        ]
+
     return manifest, infos
 
 
