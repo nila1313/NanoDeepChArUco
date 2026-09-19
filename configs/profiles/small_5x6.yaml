@@ -1,6 +1,6 @@
 name: small_5x6
 
-board: configs/boards/small_5x6.npy
+board: configs/boards/small_5x6_dict6x6_250_meters.npy
 
 deep_config: configs/deep/small_5x6.yaml
 

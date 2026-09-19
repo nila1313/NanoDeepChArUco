@@ -64,7 +64,7 @@ Both platforms used byte-identical source videos.
 
 Board:
 
-    small_5x6.npy
+    small_5x6_dict6x6_250_meters.npy
     5x6 ChArUco
     DICT_6X6_250
     20 ChArUco corners
