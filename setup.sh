@@ -312,7 +312,7 @@ cat "$ROOT/.nanodeepcharuco/backend.yml"
 section "9/9 Final setup verification"
 
 for asset in \
-    "configs/boards/small_5x6.npy" \
+    "configs/boards/small_5x6_dict6x6_250_meters.npy" \
     "configs/boards/large_7x7.npy" \
     "configs/profiles/small_5x6.yaml" \
     "configs/profiles/large_7x7.yaml" \

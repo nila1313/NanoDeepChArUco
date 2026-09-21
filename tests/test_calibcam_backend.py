@@ -5,6 +5,7 @@ from unittest.mock import patch
 
 from nanodeepcharuco.calibcam.backend import (
     build_calibcam_command,
+    build_two_stage_extrinsics_command,
     run_calibcam,
 )
 
@@ -56,6 +57,86 @@ class TestCalibCamBackend(unittest.TestCase):
                     "perspective",
                     "--data_path",
                     str(root),
+                ],
+            )
+
+    def test_two_stage_extrinsics_command_matches_two_stage_workflow(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+
+            command = build_two_stage_extrinsics_command(
+                python_executable="/opt/calibcam/bin/python",
+                videos=[
+                    (
+                        "/data/left/080_checkerboard_4/"
+                        "CADDX000023.MP4"
+                    ),
+                    (
+                        "/data/right/080_checkerboard_4/"
+                        "CADDX000023.MP4"
+                    ),
+                ],
+                detection_paths=[
+                    root / "detection_000.yml",
+                    root / "detection_001.yml",
+                ],
+                board="/data/board_small_exact_meters.npy",
+                calibration_single_paths=[
+                    root
+                    / "0_left"
+                    / "multicam_calibration.yml",
+                    root
+                    / "1_right"
+                    / "multicam_calibration.yml",
+                ],
+                models=[
+                    "omnidir",
+                ],
+                projection="fisheye_equidistant",
+                data_path=root / "multicam",
+            )
+
+            self.assertEqual(
+                command,
+                [
+                    "/opt/calibcam/bin/python",
+                    "-m",
+                    "calibcam",
+                    "--videos",
+                    (
+                        "/data/left/080_checkerboard_4/"
+                        "CADDX000023.MP4"
+                    ),
+                    (
+                        "/data/right/080_checkerboard_4/"
+                        "CADDX000023.MP4"
+                    ),
+                    "--board",
+                    "/data/board_small_exact_meters.npy",
+                    "--detection",
+                    str(root / "detection_000.yml"),
+                    str(root / "detection_001.yml"),
+                    "--calibration_single",
+                    str(
+                        root
+                        / "0_left"
+                        / "multicam_calibration.yml"
+                    ),
+                    str(
+                        root
+                        / "1_right"
+                        / "multicam_calibration.yml"
+                    ),
+                    "--calibration_multi",
+                    "--models",
+                    "omnidir",
+                    "--projection",
+                    "fisheye_equidistant",
+                    "--multi_vars",
+                    "extrinsics",
+                    "extrinsics",
+                    "--data_path",
+                    str(root / "multicam"),
                 ],
             )
 

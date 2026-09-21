@@ -123,5 +123,97 @@ class TestCalibrationWorkflow(unittest.TestCase):
         run_backend.assert_not_called()
 
 
+    @patch(
+        "nanodeepcharuco.pipeline.run_calibration."
+        "run_calibcam"
+    )
+    @patch(
+        "nanodeepcharuco.pipeline.run_calibration."
+        "build_two_stage_extrinsics_command"
+    )
+    @patch(
+        "nanodeepcharuco.pipeline.run_calibration."
+        "build_calibcam_command"
+    )
+    def test_two_stage_extrinsics_uses_existing_intrinsics(
+        self,
+        build_normal_command,
+        build_two_stage_command,
+        run_backend,
+    ):
+        config = SimpleNamespace(
+            detect_only=False,
+            calibcam_python="/opt/calibcam/python",
+            videos=[
+                "left.mp4",
+                "right.mp4",
+            ],
+            board="small_board.npy",
+            calibration_single_paths=[
+                "left_stage1.yml",
+                "right_stage1.yml",
+            ],
+            models=[
+                "omnidir",
+            ],
+            projection="fisheye_equidistant",
+        )
+
+        layout = FakeLayout()
+
+        detection_paths = [
+            Path(
+                "/tmp/run/detection_000.yml"
+            ),
+            Path(
+                "/tmp/run/detection_001.yml"
+            ),
+        ]
+
+        command = [
+            "/opt/calibcam/python",
+            "-m",
+            "calibcam",
+        ]
+
+        build_two_stage_command.return_value = command
+
+        with redirect_stdout(StringIO()):
+            run_calibration_pipeline(
+                config=config,
+                layout=layout,
+                detection_paths=detection_paths,
+            )
+
+        build_normal_command.assert_not_called()
+
+        build_two_stage_command.assert_called_once_with(
+            python_executable=(
+                "/opt/calibcam/python"
+            ),
+            videos=[
+                "left.mp4",
+                "right.mp4",
+            ],
+            detection_paths=detection_paths,
+            board="small_board.npy",
+            calibration_single_paths=[
+                "left_stage1.yml",
+                "right_stage1.yml",
+            ],
+            models=[
+                "omnidir",
+            ],
+            projection="fisheye_equidistant",
+            data_path=(
+                layout.calibcam_data_path
+            ),
+        )
+
+        run_backend.assert_called_once_with(
+            command
+        )
+
+
 if __name__ == "__main__":
     unittest.main()

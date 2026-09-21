@@ -178,6 +178,7 @@ class RunConfig:
     frames_offsets: list[int]
     models: list[str]
     projection: str
+    calibration_single_paths: Optional[list[str]]
     data_path: str
     detect_only: bool
     gamma: float
@@ -213,10 +214,33 @@ def resolve_config(args) -> RunConfig:
         else [0] * n_cams
     )
 
+    calibration_single = getattr(
+        args,
+        "calibration_single",
+        None,
+    )
+
     models = (
         list(args.models)
         if args.models is not None
-        else ["omnidir"] * n_cams
+        else (
+            ["omnidir"]
+            if calibration_single is not None
+            else ["omnidir"] * n_cams
+        )
+    )
+
+    calibration_single_paths = (
+        [
+            str(
+                Path(path)
+                .expanduser()
+                .resolve()
+            )
+            for path in calibration_single
+        ]
+        if calibration_single is not None
+        else None
     )
 
     return RunConfig(
@@ -233,6 +257,9 @@ def resolve_config(args) -> RunConfig:
         frames_offsets=frames_offsets,
         models=models,
         projection=args.projection,
+        calibration_single_paths=(
+            calibration_single_paths
+        ),
         data_path=str(
             Path(args.data_path).expanduser().resolve()
         ),
