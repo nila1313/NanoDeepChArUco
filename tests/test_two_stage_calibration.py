@@ -39,6 +39,7 @@ def test_stage1_intrinsics_build_extrinsics_only_command(
         projection="fisheye_equidistant",
         calibration_single=False,
         calibration_multi=False,
+        stage1_calibration=False,
         stage1_intrinsics=(
             left_intrinsics,
             right_intrinsics,
@@ -77,4 +78,51 @@ def test_stage1_intrinsics_build_extrinsics_only_command(
         "extrinsics",
     ]
 
+    assert captured["check"] is True
+
+
+def test_stage1_calibration_runs_single_camera_only(
+    tmp_path,
+    monkeypatch,
+):
+    detection_left = tmp_path / "detection_000.npy"
+    detection_right = tmp_path / "detection_001.npy"
+
+    captured = {}
+
+    def fake_run(command, check):
+        captured["command"] = command
+        captured["check"] = check
+
+    monkeypatch.setattr(
+        "nanodeepcharuco.__main__.subprocess.run",
+        fake_run,
+    )
+
+    args = Namespace(
+        calibcam_python=Path("/tmp/calibcam-python"),
+        videos=[
+            Path("/tmp/left.MP4"),
+            Path("/tmp/right.MP4"),
+        ],
+        board=Path("/tmp/large_board.npy"),
+        models=("omnidir", "omnidir"),
+        projection="fisheye_equidistant",
+        calibration_single=False,
+        calibration_multi=False,
+        stage1_calibration=True,
+        stage1_intrinsics=None,
+    )
+
+    run_calibcam(
+        args,
+        tmp_path / "run",
+        (detection_left, detection_right),
+    )
+
+    command = captured["command"]
+
+    assert "--calibration_single" in command
+    assert "--calibration_multi" not in command
+    assert "--multi_vars" not in command
     assert captured["check"] is True

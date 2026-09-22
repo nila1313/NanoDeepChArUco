@@ -61,6 +61,14 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--calibration_multi", action="store_true",
                         help="Backward-compatible alias that enables CalibCam.")
     parser.add_argument(
+        "--stage1_calibration",
+        action="store_true",
+        help=(
+            "Run Stage 1 of the wide-angle two-stage workflow: "
+            "estimate independent camera intrinsics from the large board."
+        ),
+    )
+    parser.add_argument(
         "--stage1_intrinsics",
         nargs=2,
         type=existing_file,
@@ -74,7 +82,16 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     )
     parser.add_argument("--calibcam_python", type=Path,
                         default=Path(sys.executable))
-    return parser.parse_args(argv)
+
+    args = parser.parse_args(argv)
+
+    if args.stage1_calibration and args.stage1_intrinsics is not None:
+        parser.error(
+            "--stage1_calibration and --stage1_intrinsics "
+            "cannot be used together"
+        )
+
+    return args
 
 
 def resolved(path: Path) -> Path:
@@ -120,7 +137,10 @@ def run_calibcam(args: argparse.Namespace, output_root: Path,
         "--projection", args.projection,
         "--data_path", str(calibcam_output),
     ]
-    if args.stage1_intrinsics is not None:
+    if getattr(args, "stage1_calibration", False):
+        command.append("--calibration_single")
+
+    elif args.stage1_intrinsics is not None:
         command.extend([
             "--calibration_single",
             *(str(path) for path in args.stage1_intrinsics),
@@ -182,9 +202,13 @@ def main(argv: list[str] | None = None) -> int:
         "frames_step": args.frames_step, "frames_offsets": list(args.frames_offsets),
         "models": list(args.models), "projection": args.projection,
         "calibration_mode": (
-            "two_stage_extrinsics"
-            if args.stage1_intrinsics is not None
-            else "standard"
+            "two_stage_intrinsics"
+            if args.stage1_calibration
+            else (
+                "two_stage_extrinsics"
+                if args.stage1_intrinsics is not None
+                else "standard"
+            )
         ),
         "stage1_intrinsics": (
             [str(path) for path in args.stage1_intrinsics]
@@ -200,6 +224,7 @@ def main(argv: list[str] | None = None) -> int:
     print(f"Detection output: {inputs_dir}")
     if (
         args.run_calibcam
+        or args.stage1_calibration
         or args.calibration_single
         or args.calibration_multi
         or args.stage1_intrinsics is not None
