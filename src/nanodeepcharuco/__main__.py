@@ -129,18 +129,61 @@ def make_detector(args: argparse.Namespace, side: str, output_root: Path):
 def run_calibcam(args: argparse.Namespace, output_root: Path,
                  detection_paths: tuple[Path, Path]) -> None:
     calibcam_output = output_root / "calibcam_output"
-    command = [
-        str(resolved(args.calibcam_python)), "-m", "calibcam",
-        "--videos", *(str(path) for path in args.videos),
-        "--detection", *(str(path) for path in detection_paths),
-        "--board", str(args.board), "--models", *args.models,
-        "--projection", args.projection,
-        "--data_path", str(calibcam_output),
-    ]
-    if getattr(args, "stage1_calibration", False):
-        command.append("--calibration_single")
+    calibcam_python = str(resolved(args.calibcam_python))
 
-    elif args.stage1_intrinsics is not None:
+    if getattr(args, "stage1_calibration", False):
+        for side, video, detection, model in zip(
+            ("left", "right"),
+            args.videos,
+            detection_paths,
+            args.models,
+        ):
+            side_output = calibcam_output / side
+            side_output.mkdir(parents=True, exist_ok=True)
+
+            command = [
+                calibcam_python,
+                "-m",
+                "calibcam",
+                "--videos",
+                str(video),
+                "--detection",
+                str(detection),
+                "--board",
+                str(args.board),
+                "--models",
+                model,
+                "--projection",
+                args.projection,
+                "--data_path",
+                str(side_output),
+                "--calibration_single",
+                "--calibration_multi",
+            ]
+
+            subprocess.run(command, check=True)
+
+        return
+
+    command = [
+        calibcam_python,
+        "-m",
+        "calibcam",
+        "--videos",
+        *(str(path) for path in args.videos),
+        "--detection",
+        *(str(path) for path in detection_paths),
+        "--board",
+        str(args.board),
+        "--models",
+        *args.models,
+        "--projection",
+        args.projection,
+        "--data_path",
+        str(calibcam_output),
+    ]
+
+    if args.stage1_intrinsics is not None:
         command.extend([
             "--calibration_single",
             *(str(path) for path in args.stage1_intrinsics),

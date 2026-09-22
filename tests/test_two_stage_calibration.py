@@ -81,29 +81,31 @@ def test_stage1_intrinsics_build_extrinsics_only_command(
     assert captured["check"] is True
 
 
-def test_stage1_calibration_runs_single_camera_only(
+def test_stage1_calibration_runs_independent_camera_refinements(
     tmp_path,
     monkeypatch,
 ):
     detection_left = tmp_path / "detection_000.npy"
     detection_right = tmp_path / "detection_001.npy"
 
-    captured = {}
+    calls = []
 
     def fake_run(command, check):
-        captured["command"] = command
-        captured["check"] = check
+        calls.append((command, check))
 
     monkeypatch.setattr(
         "nanodeepcharuco.__main__.subprocess.run",
         fake_run,
     )
 
+    left_video = Path("/tmp/left.MP4")
+    right_video = Path("/tmp/right.MP4")
+
     args = Namespace(
         calibcam_python=Path("/tmp/calibcam-python"),
         videos=[
-            Path("/tmp/left.MP4"),
-            Path("/tmp/right.MP4"),
+            left_video,
+            right_video,
         ],
         board=Path("/tmp/large_board.npy"),
         models=("omnidir", "omnidir"),
@@ -114,15 +116,53 @@ def test_stage1_calibration_runs_single_camera_only(
         stage1_intrinsics=None,
     )
 
+    output_root = tmp_path / "run"
+
     run_calibcam(
         args,
-        tmp_path / "run",
+        output_root,
         (detection_left, detection_right),
     )
 
-    command = captured["command"]
+    assert len(calls) == 2
 
-    assert "--calibration_single" in command
-    assert "--calibration_multi" not in command
-    assert "--multi_vars" not in command
-    assert captured["check"] is True
+    expected = (
+        (
+            "left",
+            left_video,
+            detection_left,
+            "omnidir",
+        ),
+        (
+            "right",
+            right_video,
+            detection_right,
+            "omnidir",
+        ),
+    )
+
+    for (command, check), (
+        side,
+        video,
+        detection,
+        model,
+    ) in zip(calls, expected):
+        assert check is True
+
+        videos_index = command.index("--videos")
+        assert command[videos_index + 1] == str(video)
+
+        detection_index = command.index("--detection")
+        assert command[detection_index + 1] == str(detection)
+
+        models_index = command.index("--models")
+        assert command[models_index + 1] == model
+
+        data_path_index = command.index("--data_path")
+        assert command[data_path_index + 1] == str(
+            output_root / "calibcam_output" / side
+        )
+
+        assert "--calibration_single" in command
+        assert "--calibration_multi" in command
+        assert "--multi_vars" not in command
