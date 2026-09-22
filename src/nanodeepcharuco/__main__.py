@@ -60,6 +60,18 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
                         help="Backward-compatible alias that enables CalibCam.")
     parser.add_argument("--calibration_multi", action="store_true",
                         help="Backward-compatible alias that enables CalibCam.")
+    parser.add_argument(
+        "--stage1_intrinsics",
+        nargs=2,
+        type=existing_file,
+        default=None,
+        metavar=("LEFT_YML", "RIGHT_YML"),
+        help=(
+            "Stage-1 single-camera calibration files. "
+            "When provided, CalibCam keeps these intrinsics fixed "
+            "and optimizes stereo extrinsics only."
+        ),
+    )
     parser.add_argument("--calibcam_python", type=Path,
                         default=Path(sys.executable))
     return parser.parse_args(argv)
@@ -108,10 +120,21 @@ def run_calibcam(args: argparse.Namespace, output_root: Path,
         "--projection", args.projection,
         "--data_path", str(calibcam_output),
     ]
-    if args.calibration_single:
-        command.append("--calibration_single")
-    if args.calibration_multi:
-        command.append("--calibration_multi")
+    if args.stage1_intrinsics is not None:
+        command.extend([
+            "--calibration_single",
+            *(str(path) for path in args.stage1_intrinsics),
+            "--calibration_multi",
+            "--multi_vars",
+            "extrinsics",
+            "extrinsics",
+        ])
+    else:
+        if args.calibration_single:
+            command.append("--calibration_single")
+        if args.calibration_multi:
+            command.append("--calibration_multi")
+
     subprocess.run(command, check=True)
 
 
@@ -158,6 +181,16 @@ def main(argv: list[str] | None = None) -> int:
         "frames_start": args.frames_start, "frames_end": args.frames_end,
         "frames_step": args.frames_step, "frames_offsets": list(args.frames_offsets),
         "models": list(args.models), "projection": args.projection,
+        "calibration_mode": (
+            "two_stage_extrinsics"
+            if args.stage1_intrinsics is not None
+            else "standard"
+        ),
+        "stage1_intrinsics": (
+            [str(path) for path in args.stage1_intrinsics]
+            if args.stage1_intrinsics is not None
+            else None
+        ),
         "detections": [str(path) for path in detection_paths],
         "detected_frames": [len(data) for data in camera_data],
     }
@@ -165,7 +198,12 @@ def main(argv: list[str] | None = None) -> int:
         json.dumps(manifest, indent=2) + "\n", encoding="utf-8"
     )
     print(f"Detection output: {inputs_dir}")
-    if args.run_calibcam or args.calibration_single or args.calibration_multi:
+    if (
+        args.run_calibcam
+        or args.calibration_single
+        or args.calibration_multi
+        or args.stage1_intrinsics is not None
+    ):
         run_calibcam(args, output_root, detection_paths)
         print(f"Calibration output: {output_root / 'calibcam_output'}")
     return 0
