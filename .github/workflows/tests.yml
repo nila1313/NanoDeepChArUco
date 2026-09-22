@@ -34,7 +34,7 @@ jobs:
       - name: Install package
         run: |
           python -m pip install --upgrade pip
-          python -m pip install -e '.[test]'
+          python -m pip install -e '.[hybrid,test]'
 
       - name: Check CLI
         run: nanodeepcharuco --help >/dev/null
