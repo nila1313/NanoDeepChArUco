@@ -16,65 +16,35 @@ class DeepCharucoDetection:
 
 
 class DeepCharucoDetector:
-    """
-    Adapter around the verified DeepChArUco inference code.
-
-    All external paths are provided explicitly so the package
-    remains portable across machines.
-    """
-
     def __init__(
         self,
-        deepcharuco_root: str | Path,
+        project_root: str | Path,
         deep_checkpoint: str | Path,
         refinenet_checkpoint: str | Path,
-        config_path: str | Path,
+        config_path: str | Path | None = None,
         device: str | None = None,
     ):
-        self.deepcharuco_root = (
-            Path(deepcharuco_root)
-            .expanduser()
-            .resolve()
+        self.project_root = Path(project_root).expanduser().resolve()
+
+        self.deep_src = (
+            self.project_root
+            / "third_party"
+            / "deepcharuco"
+            / "upstream"
+            / "src"
         )
 
-        self.models_src = (
-            self.deepcharuco_root
-            / "models"
-        )
+        self.models_src = self.deep_src / "models"
 
-        if not self.deepcharuco_root.is_dir():
-            raise NotADirectoryError(
-                "DeepChArUco source directory not found: "
-                f"{self.deepcharuco_root}"
-            )
-
-        if str(self.deepcharuco_root) not in sys.path:
-            sys.path.insert(
-                0,
-                str(self.deepcharuco_root),
-            )
-
-        if self.models_src.is_dir():
-            if str(self.models_src) not in sys.path:
-                sys.path.insert(
-                    0,
-                    str(self.models_src),
-                )
+        sys.path.insert(0, str(self.deep_src))
+        sys.path.insert(0, str(self.models_src))
 
         from configs import load_configuration
         from inference import load_models, infer_image
 
-        self._load_configuration = (
-            load_configuration
-        )
-
-        self._load_models = (
-            load_models
-        )
-
-        self._infer_image = (
-            infer_image
-        )
+        self._load_configuration = load_configuration
+        self._load_models = load_models
+        self._infer_image = infer_image
 
         self.deep_checkpoint = (
             Path(deep_checkpoint)
@@ -88,29 +58,26 @@ class DeepCharucoDetector:
             .resolve()
         )
 
-        self.config_path = (
-            Path(config_path)
-            .expanduser()
-            .resolve()
-        )
-
         if not self.deep_checkpoint.is_file():
             raise FileNotFoundError(
-                "DeepChArUco checkpoint not found: "
+                f"Deep ChArUco checkpoint not found: "
                 f"{self.deep_checkpoint}"
             )
 
         if not self.refinenet_checkpoint.is_file():
             raise FileNotFoundError(
-                "RefineNet checkpoint not found: "
+                f"RefineNet checkpoint not found: "
                 f"{self.refinenet_checkpoint}"
             )
 
-        if not self.config_path.is_file():
-            raise FileNotFoundError(
-                "DeepChArUco config not found: "
-                f"{self.config_path}"
-            )
+        if config_path is None:
+            config_path = self.deep_src / "config.yaml"
+
+        self.config_path = (
+            Path(config_path)
+            .expanduser()
+            .resolve()
+        )
 
         if device is None:
             if torch.backends.mps.is_available():
@@ -120,29 +87,24 @@ class DeepCharucoDetector:
             else:
                 device = "cpu"
 
-        self.device = torch.device(
-            device
-        )
+        self.device = torch.device(device)
 
         self.config = None
         self.deepc = None
         self.refinenet = None
 
     def load(self):
-        self.config = (
-            self._load_configuration(
-                str(self.config_path)
-            )
+        self.config = self._load_configuration(
+            str(self.config_path)
         )
 
-        (
-            self.deepc,
-            self.refinenet,
-        ) = self._load_models(
-            str(self.deep_checkpoint),
-            str(self.refinenet_checkpoint),
-            n_ids=self.config.n_ids,
-            device=self.device,
+        self.deepc, self.refinenet = (
+            self._load_models(
+                str(self.deep_checkpoint),
+                str(self.refinenet_checkpoint),
+                n_ids=self.config.n_ids,
+                device=self.device,
+            )
         )
 
         return self
@@ -158,9 +120,7 @@ class DeepCharucoDetector:
             )
 
         if frame is None:
-            raise ValueError(
-                "Input frame is None"
-            )
+            raise ValueError("Input frame is None")
 
         h, w = frame.shape[:2]
 
@@ -174,11 +134,8 @@ class DeepCharucoDetector:
 
         small = cv2.resize(
             frame,
-            (
-                input_width,
-                input_height,
-            ),
-            interpolation=cv2.INTER_LINEAR_EXACT,
+            (input_width, input_height),
+            interpolation=cv2.INTER_AREA,
         )
 
         keypoints, _ = self._infer_image(
@@ -190,15 +147,8 @@ class DeepCharucoDetector:
             device=self.device,
         )
 
-        scale_x = (
-            w
-            / float(input_width)
-        )
-
-        scale_y = (
-            h
-            / float(input_height)
-        )
+        scale_x = w / float(input_width)
+        scale_y = h / float(input_height)
 
         return (
             keypoints,
@@ -211,26 +161,22 @@ class DeepCharucoDetector:
         frame: np.ndarray,
     ):
         """
-        Return:
+        Match the previous experimental deep_predictions() behavior.
+
+        Returns:
             clean detections,
-            duplicate corner IDs,
+            duplicate IDs,
             raw Deep prediction count.
         """
 
-        (
-            keypoints,
-            scale_x,
-            scale_y,
-        ) = self._infer_keypoints(
-            frame
+        keypoints, scale_x, scale_y = (
+            self._infer_keypoints(frame)
         )
 
         by_id = {}
 
         for x, y, corner_id in keypoints:
-            corner_id = int(
-                corner_id
-            )
+            corner_id = int(corner_id)
 
             by_id.setdefault(
                 corner_id,
@@ -248,29 +194,16 @@ class DeepCharucoDetector:
         clean = {}
         duplicates = []
 
-        for (
-            corner_id,
-            points,
-        ) in by_id.items():
-
+        for corner_id, points in by_id.items():
             if len(points) == 1:
-                clean[
-                    corner_id
-                ] = points[0]
-
+                clean[corner_id] = points[0]
             else:
-                duplicates.append(
-                    corner_id
-                )
+                duplicates.append(corner_id)
 
         return (
             clean,
-            sorted(
-                duplicates
-            ),
-            len(
-                keypoints
-            ),
+            sorted(duplicates),
+            len(keypoints),
         )
 
     def detect(
@@ -278,26 +211,20 @@ class DeepCharucoDetector:
         frame: np.ndarray,
     ) -> list[DeepCharucoDetection]:
 
-        clean, _, _ = (
-            self.detect_with_audit(
-                frame
-            )
+        clean, _, _ = self.detect_with_audit(
+            frame
         )
 
         detections = [
             DeepCharucoDetection(
-                corner_id=int(
-                    corner_id
-                ),
+                corner_id=int(corner_id),
                 point=np.asarray(
                     point,
                     dtype=np.float32,
                 ),
             )
-            for (
-                corner_id,
-                point,
-            ) in clean.items()
+            for corner_id, point
+            in clean.items()
         ]
 
         detections.sort(

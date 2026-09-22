@@ -1,48 +1,49 @@
 # NanoDeepChArUco
 
-NanoDeepChArUco is a portable stereo-camera calibration pipeline combining:
+NanoDeepChArUco is a stereo ChArUco detection front end that produces
+CalibCam-compatible detections from two camera videos.
 
-- ArUco Nano detection
-- gamma-enhanced Nano retry
-- DeepChArUco recovery
-- automatic stereo synchronization
-- CalibCam-compatible ChArUco detections
-- official BBO CalibCam calibration
+The pipeline uses explicit frame sampling and offsets, so the temporal
+alignment is controlled directly by the user.
+
+Three detector modes are available:
+
+- `opencv` — OpenCV ArUco/ChArUco baseline
+- `nano` — ArUco Nano marker detection followed by ChArUco interpolation
+- `hybrid` — ArUco Nano with gamma retry and DeepChArUco recovery
+
+The generated detection payloads can be passed directly to CalibCam.
 
 ## Pipeline
 
 ```text
-video pair
-   ↓
-Raw ArUco Nano
-   ↓
-Gamma Nano retry
-   ↓
-DeepChArUco recovery
-   ↓
-shared stereo detections
-   ↓
-automatic trusted synchronization
-   ↓
-CalibCam detection YAML
-   ↓
-official CalibCam
-   ↓
-final calibration
+left/right videos
+        │
+        ▼
+frame sampling + explicit offsets
+        │
+        ▼
+OpenCV / ArUco Nano / Hybrid detector
+        │
+        ▼
+ChArUco corners
+        │
+        ▼
+CalibCam-compatible detection payloads
+        │
+        ▼
+optional CalibCam calibration
 ```
 
 ## Installation
 
-Prerequisites:
+Requirements:
 
 - Git
 - Git LFS
-- Conda / Miniforge
-- CMake
-- OpenCV development libraries
-- Homebrew on macOS
+- Conda or Miniforge
 
-Clone the repository:
+Clone the repository together with the DeepChArUco submodule:
 
 ```bash
 git clone --recurse-submodules \
@@ -51,406 +52,259 @@ git clone --recurse-submodules \
 cd NanoDeepChArUco
 ```
 
-Run the complete setup:
+Run the setup script:
 
 ```bash
 ./setup.sh
 ```
 
-The setup script prepares:
-
-- Git LFS model assets
-- the pinned DeepChArUco submodule
-- the `nanodeepcharuco` Conda environment
-- the native ArUco Nano detector
-- the verified CalibCam 4.2 environment
-- machine-local CalibCam backend configuration
-
-A successful setup finishes with:
-
-```text
-READY
-```
-
-Then activate:
+Then activate the environment:
 
 ```bash
 conda activate nanodeepcharuco
 ```
 
-## Portable profiles
+## Board files
 
-### `small_5x6`
+Two board definitions are included:
 
-- 5 x 6 ChArUco squares
-- `DICT_6X6_250`
-- 20 ChArUco corner IDs
+```text
+configs/boards/
+├── large_7x7_dict4x4_50.npy
+└── small_5x6_dict6x6_250_meters.npy
+```
 
-### `large_7x7`
+The small board uses `DICT_6X6_250`.
 
-- 7 x 7 ChArUco squares
-- `DICT_4X4_50`
-- 36 ChArUco corner IDs
+The large board uses `DICT_4X4_50`.
 
-## Default stereo calibration
-
-For a normal two-camera run, NanoDeepChArUco automatically estimates
-temporal synchronization and keeps only trusted stable synchronization
-regions.
-
-Canonical native-luminance decoding is enabled by default for
-cross-platform reproducibility.
-
-Example:
+## Nano example
 
 ```bash
-RUN="runs/auto_sync_run"
-mkdir -p "$RUN"
-
 nanodeepcharuco \
-  --videos /path/to/left.MP4 /path/to/right.MP4 \
-  --profile small_5x6 \
+  --videos \
+  /path/to/left.MP4 \
+  /path/to/right.MP4 \
+  --board \
+  configs/boards/small_5x6_dict6x6_250_meters.npy \
+  --detector nano \
   --frames_start 0 \
   --frames_end 2640 \
   --frames_step 20 \
-  --sync_offsets -3 -2 -1 0 1 2 3 \
-  --sync_frame_step 20 \
-  --sync_window_size 400 \
-  --sync_window_step 200 \
-  --sync_min_inlier_ratio 0.20 \
-  --sync_min_ratio_gap 0.05 \
-  --sync_min_persistence 2 \
-  --sync_max_gap_frames 400 \
-  --models omnidir omnidir \
-  --projection perspective \
-  --data_path "$RUN" \
-  2>&1 | tee "$RUN/full_pipeline.log"
+  --frames_offsets 0 1 \
+  --data_path runs/example_nano
 ```
 
-No `--auto_sync` flag is required for a normal two-video run.
+## Frame-offset semantics
 
-The legacy `--auto_sync` flag is still accepted for backward
-compatibility.
-
-Automatic synchronization evaluates candidate offsets, keeps trusted
-windows, combines persistent evidence into stable segments, and gives
-both cameras shared logical detection IDs.
+Offsets specify which physical video frame is used for each synchronized sample.
 
 For example:
 
 ```text
-offset +1: Left(t) ↔ Right(t+1)
-offset -1: Left(t) ↔ Right(t-1)
+--frames_offsets 0 1
 ```
 
-## Fixed-offset expert mode
+means:
 
-If a validated frame offset is already known and should be forced, use
-fixed synchronization.
+```text
+Left(t) ↔ Right(t + 1)
+```
 
-Example:
+while:
+
+```text
+--frames_offsets 1 0
+```
+
+means:
+
+```text
+Left(t + 1) ↔ Right(t)
+```
+
+The output keeps synchronized sample IDs separate from physical frame numbers:
+
+- `detection_idxs` stores the shared synchronized sample index
+- `frame_idxs` stores the actual physical frame used from each video
+
+For example, with:
+
+```text
+frames_start = 420
+frames_step = 20
+frames_offsets = 0 1
+```
+
+the first synchronized sample uses:
+
+```text
+left frame  = 420
+right frame = 421
+detection index = 0 for both cameras
+```
+
+## Hybrid example
+
+The hybrid detector combines ArUco Nano with DeepChArUco recovery.
+
+Example using the included large-board detector:
 
 ```bash
-RUN="runs/fixed_offset_run"
-mkdir -p "$RUN"
-
 nanodeepcharuco \
-  --videos /path/to/left.MP4 /path/to/right.MP4 \
-  --profile small_5x6 \
-  --frames_start 0 \
-  --frames_end 2640 \
+  --videos \
+  /path/to/left.MP4 \
+  /path/to/right.MP4 \
+  --board \
+  configs/boards/large_7x7_dict4x4_50.npy \
+  --detector hybrid \
+  --deep_checkpoint \
+  models/deepcharuco/large_7x7/detector.ckpt \
+  --refinenet_checkpoint \
+  models/refinenet/refinenet.ckpt \
+  --deep_config \
+  configs/deepcharuco/pair2_epoch146.yaml \
   --frames_step 20 \
-  --fixed_sync \
+  --frames_offsets 0 1 \
+  --data_path runs/example_hybrid
+```
+
+The pinned DeepChArUco source is stored as a Git submodule under:
+
+```text
+third_party/deepcharuco/upstream
+```
+
+## Output
+
+A detection run creates:
+
+```text
+runs/example/
+├── inputs/
+│   ├── detection_000.npy
+│   └── detection_001.npy
+├── run_manifest.json
+└── work/
+```
+
+`work/` contains temporary detector files when required by the selected detector.
+
+Each detection file follows the CalibCam-compatible array schema and contains:
+
+```text
+version
+storage_method
+marker_coords
+marker_ids
+detection_idxs
+frame_idxs
+```
+
+## Running CalibCam
+
+CalibCam is optional and can be kept in a separate Python environment.
+
+To continue directly into CalibCam, provide its Python interpreter:
+
+```bash
+nanodeepcharuco \
+  --videos \
+  /path/to/left.MP4 \
+  /path/to/right.MP4 \
+  --board \
+  configs/boards/small_5x6_dict6x6_250_meters.npy \
+  --detector nano \
+  --frames_step 20 \
   --frames_offsets 0 1 \
   --models omnidir omnidir \
   --projection perspective \
-  --data_path "$RUN" \
-  2>&1 | tee "$RUN/full_pipeline.log"
+  --data_path runs/example_calibration \
+  --run_calibcam \
+  --calibration_single \
+  --calibration_multi \
+  --calibcam_python /path/to/calibcam/environment/bin/python
 ```
 
-`--frames_offsets 0 1` means:
+CalibCam results are written under:
 
 ```text
-Left(t) ↔ Right(t+1)
+runs/example_calibration/calibcam_output/
 ```
 
-In general:
+## Models
+
+Runtime checkpoints are stored with Git LFS:
 
 ```text
-physical_frame[camera] = logical_frame + frame_offset[camera]
+models/
+├── deepcharuco/
+│   ├── large_7x7/
+│   │   └── detector.ckpt
+│   └── small_5x6/
+│       └── detector.ckpt
+└── refinenet/
+    └── refinenet.ckpt
 ```
 
-Explicit `--frames_offsets` also preserve the historical fixed-offset
-behavior even if `--fixed_sync` is omitted.
+## Native ArUco Nano
 
-## Portable video decoding
+The native ArUco Nano source is stored under:
 
-Canonical luminance decoding is enabled by default for CLI runs.
+```text
+third_party/aruco_nano/source/
+```
 
-This reads the native video luminance plane and avoids platform-dependent
-YUV-to-BGR conversion before expanding the frame to the three-channel format
-expected by the detector.
-
-The default portable behavior can also be requested explicitly with:
+Build it independently with:
 
 ```bash
---canonical_luma
+bash scripts/build_nano.sh
 ```
 
-For legacy comparison only, it can be disabled with:
-
-```bash
---no_canonical_luma
-```
-
-The legacy decoding path is not the recommended mode for reproducible
-cross-platform runs.
-
-## Detection only
-
-To generate NanoDeepChArUco detections without running CalibCam:
-
-```bash
-nanodeepcharuco \
-  --videos /path/to/left.MP4 /path/to/right.MP4 \
-  --profile small_5x6 \
-  --frames_step 20 \
-  --detect_only \
-  --data_path runs/detection_only
-```
-
-For two-camera input, detection-only mode still uses the default automatic
-trusted synchronization. Use `--fixed_sync --frames_offsets ...` only when
-a fixed alignment is intentionally required.
-
-## Detector routing
-
-The recovery order is:
-
-```text
-RAW_NANO
-   ↓
-GAMMA_NANO
-   ↓
-DEEP_NANO_H
-   ↓
-DEEP_SELF
-```
-
-`GAMMA_NANO` uses gamma 1.4 and is selected only when it improves the Nano result.
-
-`DEEP_NANO_H` uses DeepChArUco recovery supported by Nano geometry.
-
-`DEEP_SELF` is the final DeepChArUco self-recovery stage.
-
-## Output structure
-
-NanoDeepChArUco uses the supplied `--data_path` as the CalibCam data
-directory.
-
-CalibCam-compatible detection files and official CalibCam calibration
-outputs are written directly at the `data_path` root. NanoDeepChArUco-specific
-metadata is kept separately under `nanodeepcharuco/`.
-
-A normal full stereo run contains:
-
-```text
-data_path/
-├── detection_000.yml
-├── detection_001.yml
-├── calibration_single_000.yml
-├── calibration_single_001.yml
-├── joinedsingles_calibraton.yml
-├── joinedsingles_calibraton.npy
-├── joinedsingles_calibraton.mat
-├── multicam_calibration.yml
-├── multicam_calibration.npy
-├── multicam_calibration.mat
-├── multicam_calibration_board_positions.yml
-├── detections_cam_000.svg
-├── detections_cam_001.svg
-└── nanodeepcharuco/
-    ├── resolved_config.yml
-    ├── input_manifest.yml
-    └── tmp/
-```
-
-Automatic-synchronization runs additionally store synchronization metadata
-inside the NanoDeepChArUco namespace:
-
-```text
-data_path/
-└── nanodeepcharuco/
-    ├── sync_window_results.yml
-    ├── sync_segments.yml
-    └── sync_pairs.yml
-```
-
-This separation keeps the public CalibCam file layout compatible with
-official CalibCam while preventing NanoDeepChArUco-specific metadata from
-being mixed with CalibCam outputs.
-
-`full_pipeline.log` is not created automatically by the package. The example
-commands create it with `tee` when a persistent terminal log is desired.
-
-## Verified dependency revisions
-
-### DeepChArUco
-
-```text
-37d569fc582b790843dce408c14556747927711c
-```
-
-### BBO CalibCam
-
-```text
-version: 4.2.0
-commit: f51aa60961b6a9a7abea8b7c377dd5dfa7599f50
-```
-
-### BBO CalibCamLib
-
-```text
-version: 0.5.2
-commit: 5e3888b0647a4e20cf54ec54734ec6ed770a2169
-```
-
-CalibCam runs in a separate Python 3.10 Conda environment.
-
-The machine-specific backend path is stored in:
-
-```text
-.nanodeepcharuco/backend.yml
-```
-
-This file is generated by `setup.sh` and intentionally excluded from Git.
-
-An explicit backend can still be supplied with:
-
-```bash
---calibcam_python /path/to/python
-```
-
-or with:
-
-```bash
-export NANODEEPCHARUCO_CALIBCAM_PYTHON=/path/to/python
-```
-
-## Cross-platform validation
-
-The current portable pipeline has been validated end-to-end on:
-
-```text
-macOS ARM
-Linux x86-64
-```
-
-using both built-in board profiles.
-
-### Pair 01 — `small_5x6`
-
-Dataset:
-
-```text
-20230613/4pi/030_checkerboard_1
-```
-
-Automatic synchronization selected the trusted `+1` alignment and produced:
-
-```text
-111 synchronized stereo pairs
-synchronized range: 400 to 2600
-
-final median reprojection residuals:
-camera 0: 0.23 px
-camera 1: 0.36 px
-```
-
-Mac and Linux produced identical synchronization decisions, synchronized
-frame mappings, ChArUco IDs, finite-value masks, and valid-corner masks.
-
-The maximum cross-platform detected-corner difference was approximately:
-
-```text
-0.000122 px
-```
-
-The final stereo calibrations were practically equivalent.
-
-Full report:
-
-```text
-docs/validation/PAIR01_PORTABILITY_VALIDATION.md
-```
-
-### Pair 02 — `large_7x7`
-
-Dataset:
-
-```text
-20230613/4pi/040_checkerboard_2
-```
-
-Automatic synchronization produced two trusted `+1` stable regions and:
-
-```text
-243 synchronized stereo pairs
-synchronized range: 420 to 8680
-
-final median reprojection residuals:
-camera 0: 0.88 px
-camera 1: 0.77 px
-```
-
-Mac and Linux again produced identical synchronization decisions,
-synchronized frame mappings, ChArUco IDs, finite-value masks, and
-valid-corner masks.
-
-Detected-corner differences remained sub-millipixel and the final stereo
-calibrations were practically equivalent.
-
-Full report:
-
-```text
-docs/validation/PAIR02_PORTABILITY_VALIDATION.md
-```
-
-### Portability statement
-
-The supported wording for the validated pipeline is:
-
-> Numerically reproducible across the tested platforms, with negligible
-> architecture-dependent floating-point differences.
-
-The implementation is **not** claimed to be universally bit-for-bit
-deterministic across CPU architectures.
-
-Together, Pair 01 and Pair 02 validate both built-in profiles:
-
-```text
-small_5x6
-large_7x7
-```
-
-### Additional synchronization regression
-
-Pair 03 also completed automatic synchronization and final CalibCam
-calibration successfully:
-
-```text
-stable offset = -1
-105 synchronized stereo pairs
-```
-
-## Notes
-
-The native ArUco Nano executable is built locally at:
+The generated executable is:
 
 ```text
 third_party/aruco_nano/build/detect_batch
 ```
 
-Build outputs, calibration runs, and machine-local runtime configuration are intentionally excluded from version control.
+The build directory is generated locally and is not committed.
 
-Model checkpoints are stored using Git LFS.
+## Tests
+
+Run the unit tests with:
+
+```bash
+pytest -q
+```
+
+Check the command-line interface with:
+
+```bash
+nanodeepcharuco --help
+```
+
+## Repository branches
+
+`main`
+
+The clean explicit-offset NanoDeepChArUco pipeline documented here.
+
+`feature/advanced-auto-sync-pipeline`
+
+Preserves the previous advanced pipeline with automatic synchronization and the broader calibration workflow.
+
+`feature/two-stage-calibration`
+
+Preserves the focused two-stage calibration development branch.
+
+## Third-party components
+
+ArUco Nano and DeepChArUco retain their own source provenance and licensing information in their respective third-party directories.
+
+## License
+
+The original NanoDeepChArUco source code in this repository is licensed under the MIT License. See `LICENSE`.
+
+Third-party components retain their own licenses.
+
+The model checkpoint files under `models/` are not covered by the repository MIT License unless separate licensing terms explicitly state otherwise.

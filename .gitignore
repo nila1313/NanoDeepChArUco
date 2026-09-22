@@ -1,17 +1,28 @@
+# Python
 __pycache__/
 *.py[cod]
-.DS_Store
-
+.pytest_cache/
+*.egg-info/
+build/
+dist/
 .venv/
 venv/
 .env/
 
-build/
-dist/
-*.egg-info/
+# OS/editor files
+.DS_Store
+._*
 
+# Calibration videos
+*.MP4
+*.mp4
+*.MOV
+*.mov
+
+# Generated runs
 runs/
 
+# Model assets
 models/*
 !models/README.md
 !models/deepcharuco/
@@ -22,11 +33,6 @@ models/*
 !models/refinenet/
 !models/refinenet/refinenet.ckpt
 
-*.MP4
-*.mp4
-*.MOV
-*.mov
-
 *.ckpt
 *.pth
 *.pt
@@ -35,6 +41,7 @@ models/*
 !models/deepcharuco/small_5x6/detector.ckpt
 !models/refinenet/refinenet.ckpt
 
+# Native ArUco Nano
 third_party/aruco_nano/*
 !third_party/aruco_nano/README.md
 !third_party/aruco_nano/LICENSE
@@ -43,9 +50,10 @@ third_party/aruco_nano/*
 !third_party/aruco_nano/source/**
 third_party/aruco_nano/build/
 
+# DeepChArUco is kept as a pinned submodule
 third_party/deepcharuco/*
 !third_party/deepcharuco/README.md
 !third_party/deepcharuco/upstream
 
-# Machine-local NanoDeepChArUco runtime configuration
+# Local runtime configuration
 .nanodeepcharuco/
