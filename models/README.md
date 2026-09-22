@@ -15,7 +15,7 @@ models/
     └── refinenet.ckpt
 ```
 
-Profiles in `configs/profiles/` reference these paths.
+These checkpoints are selected explicitly through the NanoDeepChArUco command-line options.
 
 Verified model compatibility:
 
@@ -29,7 +29,7 @@ Verified model compatibility:
   - ChArUco IDs: 20
   - detector output head: 21 channels
 
-The RefineNet checkpoint is shared by both profiles.
+The RefineNet checkpoint can be supplied with `--refinenet_checkpoint`.
 
 After cloning, retrieve the checkpoint contents with:
 

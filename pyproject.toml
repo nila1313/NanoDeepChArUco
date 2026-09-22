@@ -4,24 +4,35 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "nanodeepcharuco"
-version = "1.1.1"
-description = "CalibCam-style Nano + DeepChArUco detection and calibration pipeline"
+version = "2.0.0"
+description = "CalibCam-compatible stereo ChArUco detection pipeline using OpenCV, ArUco Nano, and DeepChArUco"
 readme = "README.md"
 requires-python = ">=3.10,<3.11"
 dependencies = [
     "numpy==1.23.5",
     "opencv-contrib-python-headless==4.11.0.86",
+]
+
+[project.optional-dependencies]
+hybrid = [
     "PyYAML==6.0.3",
     "numba==0.56.4",
     "torch==2.0.1",
     "pytorch-lightning==1.9.3",
     "torchmetrics==0.11.1",
     "pydantic==2.13.5",
-    "lightning-utilities==0.15.3",
+]
+
+test = [
+    "pytest>=8,<9",
 ]
 
 [project.scripts]
-nanodeepcharuco = "nanodeepcharuco.cli:main"
+nanodeepcharuco = "nanodeepcharuco.__main__:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
