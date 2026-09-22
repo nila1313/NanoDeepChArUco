@@ -232,6 +232,73 @@ CalibCam results are written under:
 runs/example_calibration/calibcam_output/
 ```
 
+## Wide-angle two-stage calibration
+
+The explicit-offset wide-angle workflow separates intrinsic calibration from
+stereo extrinsic calibration.
+
+### Stage 1: independent camera intrinsics
+
+Use the large ChArUco board. Each camera is refined independently by CalibCam
+using single-camera initialization followed by multi-calibration refinement.
+
+Example:
+
+    nanodeepcharuco \
+      --videos /path/to/large_left.MP4 /path/to/large_right.MP4 \
+      --board configs/boards/large_7x7_dict4x4_50.npy \
+      --detector hybrid \
+      --deep_checkpoint models/deepcharuco/large_7x7/detector.ckpt \
+      --refinenet_checkpoint models/refinenet/refinenet.ckpt \
+      --deep_config configs/deepcharuco/pair2_epoch146.yaml \
+      --frames_start 0 \
+      --frames_step 20 \
+      --frames_offsets 0 0 \
+      --models omnidir omnidir \
+      --projection fisheye_equidistant \
+      --stage1_calibration \
+      --calibcam_python /path/to/calibcam/python \
+      --data_path runs/two_stage/stage1
+
+The refined Stage-1 files are written to:
+
+    runs/two_stage/stage1/calibcam_output/left/multicam_calibration.yml
+    runs/two_stage/stage1/calibcam_output/right/multicam_calibration.yml
+
+### Stage 2: fixed-intrinsics stereo calibration
+
+Use the physical small ChArUco board and provide the two Stage-1 calibration
+files. Stage 2 keeps A, k, and xi fixed while optimizing stereo extrinsics and
+board poses.
+
+Example:
+
+    nanodeepcharuco \
+      --videos /path/to/small_left.MP4 /path/to/small_right.MP4 \
+      --board configs/boards/small_5x6_dict6x6_250_meters.npy \
+      --detector hybrid \
+      --deep_checkpoint models/deepcharuco/small_5x6/detector.ckpt \
+      --refinenet_checkpoint models/refinenet/refinenet.ckpt \
+      --deep_config configs/deepcharuco/small_5x6.yaml \
+      --frames_start 0 \
+      --frames_end 2640 \
+      --frames_step 20 \
+      --frames_offsets 0 1 \
+      --models omnidir omnidir \
+      --projection fisheye_equidistant \
+      --stage1_intrinsics \
+        runs/two_stage/stage1/calibcam_output/left/multicam_calibration.yml \
+        runs/two_stage/stage1/calibcam_output/right/multicam_calibration.yml \
+      --calibcam_python /path/to/calibcam/python \
+      --data_path runs/two_stage/stage2
+
+`--frames_offsets 0 1` means:
+
+    Left(t) <-> Right(t+1)
+
+The tested workflow and reference results are documented in
+[docs/wide-angle-two-stage-validation.md](docs/wide-angle-two-stage-validation.md).
+
 ## Models
 
 Runtime checkpoints are stored with Git LFS:
