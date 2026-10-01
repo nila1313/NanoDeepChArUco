@@ -29,6 +29,7 @@ from nanodeepcharuco.sync.reporting import (
 from nanodeepcharuco.sync.stability import (
     find_stable_board_segments,
     filter_pairs_by_board_stability,
+    select_motion_threshold,
 )
 
 
@@ -305,11 +306,59 @@ def run_auto_sync_stage2(
         right_by_frame,
     )
 
+    left_motion_threshold = (
+        select_motion_threshold(
+            left_by_frame,
+            mode=args.stable_motion_mode,
+            fixed_threshold_px=(
+                args.stable_motion_px
+            ),
+            percentile=(
+                args.stable_motion_percentile
+            ),
+            max_threshold_px=(
+                args.stable_motion_max_px
+            ),
+        )
+    )
+
+    right_motion_threshold = (
+        select_motion_threshold(
+            right_by_frame,
+            mode=args.stable_motion_mode,
+            fixed_threshold_px=(
+                args.stable_motion_px
+            ),
+            percentile=(
+                args.stable_motion_percentile
+            ),
+            max_threshold_px=(
+                args.stable_motion_max_px
+            ),
+        )
+    )
+
+    print()
+    print("Board-stability thresholds")
+    print("--------------------------")
+    print(
+        "mode:",
+        args.stable_motion_mode,
+    )
+    print(
+        "left threshold :",
+        f"{left_motion_threshold:.3f}px",
+    )
+    print(
+        "right threshold:",
+        f"{right_motion_threshold:.3f}px",
+    )
+
     left_stable_segments = (
         find_stable_board_segments(
             left_by_frame,
             motion_threshold_px=(
-                args.stable_motion_px
+                left_motion_threshold
             ),
             min_stable_frames=(
                 args.stable_min_frames
@@ -321,7 +370,7 @@ def run_auto_sync_stage2(
         find_stable_board_segments(
             right_by_frame,
             motion_threshold_px=(
-                args.stable_motion_px
+                right_motion_threshold
             ),
             min_stable_frames=(
                 args.stable_min_frames
@@ -376,11 +425,12 @@ def run_auto_sync_stage2(
         len(pairs),
     )
 
-    if not pairs:
+    if len(pairs) < args.stable_min_pairs:
         raise RuntimeError(
-            "Synchronization succeeded, but no "
-            "stereo pairs remained after the "
-            "stable-board filter."
+            "Synchronization succeeded, but only "
+            f"{len(pairs)} stereo pairs remained after the "
+            "stable-board filter; at least "
+            f"{args.stable_min_pairs} are required."
         )
 
     print()

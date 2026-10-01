@@ -113,19 +113,104 @@ Calibration quality:
 - optimization converged: `True`
 - final cost: approximately `6.1805e+02`
 
+## Multi-dataset validation
+
+The automatic synchronization stage was subsequently tested on additional
+small-board stereo recordings.
+
+| Dataset | Automatically selected offset | Stage-2 result |
+|---|---:|---|
+| Pair 01 | +1 | 67 stable stereo pairs |
+| Pair 03 | -1 | 60 stable stereo pairs |
+| Pair 05 | -5 | 11 stable stereo pairs with adaptive stability |
+| Pair 07 | +7 | 11 stable pairs before residual cleanup |
+
+These tests exercise different temporal alignments rather than assuming one
+fixed camera offset.
+
+### Adaptive stable-board selection
+
+A fixed 2 px motion threshold was sufficient for Pair 01 and Pair 03, but was
+too restrictive for Pair 05 and Pair 07.
+
+Adaptive stability uses the observed ChArUco motion distribution, with
+`stable_motion_px` as the minimum threshold and `stable_motion_max_px` as the
+upper limit.
+
+### Pair 05
+
+Pair 05 selected offset `-5` automatically.
+
+Adaptive thresholds were approximately:
+
+- left: `5.108 px`
+- right: `5.997 px`
+
+The stable-board filter retained 11 stereo pairs.
+
+The resulting calibration converged with:
+
+- median residual, camera 0: approximately `0.40 px`
+- median residual, camera 1: approximately `0.62 px`
+- maximum residual, camera 0: approximately `2.83 px`
+- maximum residual, camera 1: approximately `3.13 px`
+
+### Pair 07 automatic outlier cleanup
+
+Pair 07 selected offset `+7` automatically.
+
+Adaptive thresholds were approximately:
+
+- left: `4.716 px`
+- right: `5.307 px`
+
+The stable-board filter retained 11 stereo pairs.
+
+The initial Stage-2 calibration contained one severe residual outlier:
+
+`1200 -> 1207`
+
+The automatic residual analysis rejected only this stereo pair and reran
+CalibCam with the remaining 10 pairs.
+
+The cleaned calibration converged with:
+
+- median residual, camera 0: `0.41 px`
+- median residual, camera 1: `0.60 px`
+- maximum residual, camera 0: `3.01 px`
+- maximum residual, camera 1: `3.00 px`
+
+The geometry changed only slightly after cleanup:
+
+- baseline change: `+0.149 mm`
+- rotation-magnitude change: `-0.107 deg`
+
+## Config-based execution
+
+The automated Stage-2 settings can be stored in:
+
+`configs/pipelines/two_stage.yaml`
+
+A typical invocation is:
+
+```bash
+python -m nanodeepcharuco \
+  --config configs/pipelines/two_stage.yaml \
+  --videos LEFT_VIDEO.mp4 RIGHT_VIDEO.mp4 \
+  --stage1_intrinsics LEFT_INTRINSICS.yml RIGHT_INTRINSICS.yml \
+  --frames_end FRAME_COUNT \
+  --device cuda \
+  --calibcam_python /path/to/calibcam/python \
+  --calibcam_board /path/to/calibcam_compatible_board.npy \
+  --data_path runs/my_calibration
+```
+
+Command-line arguments override values stored in the YAML profile.
+
 ## Conclusion
 
-The automated Stage-2 workflow successfully:
+The automated Stage-2 workflow has now been validated across four real small-board stereo recordings with automatically recovered offsets of `+1`, `-1`, `-5`, and `+7`.
 
-- detected the expected Pair-01 temporal offset automatically,
-- rejected ambiguous synchronization windows,
-- selected stable small-board observations,
-- generated correctly paired CalibCam detection payloads,
-- preserved Stage-1 intrinsics exactly,
-- and recovered stereo extrinsics consistent with the previously validated
-  Pair-01 geometry.
+Across these tests the pipeline demonstrated automatic temporal-offset recovery, adaptive stable-board selection, fixed Stage-1 intrinsics, extrinsics-only optimization, residual-based stereo-pair rejection, and cleaned recalibration.
 
-This validates the automated two-stage workflow on Pair 01.
-
-The current validation is dataset-specific and does not establish universal
-performance across all camera pairs or recordings.
+These results validate the implementation across the tested recordings, but do not imply universal performance for every camera system or recording condition.

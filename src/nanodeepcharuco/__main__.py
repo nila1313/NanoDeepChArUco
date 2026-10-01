@@ -6,6 +6,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+import yaml
+
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
 
@@ -23,7 +25,59 @@ def positive_int(value: str) -> int:
     return number
 
 
+def load_config_defaults(
+    argv: list[str] | None,
+) -> tuple[Path | None, dict]:
+    """
+    Read --config before parsing the main CLI.
+
+    Values from the YAML file become defaults. Explicit command-line
+    arguments parsed later always take precedence.
+    """
+
+    config_parser = argparse.ArgumentParser(
+        add_help=False,
+    )
+
+    config_parser.add_argument(
+        "--config",
+        type=existing_file,
+        default=None,
+    )
+
+    config_args, _ = config_parser.parse_known_args(
+        argv,
+    )
+
+    if config_args.config is None:
+        return None, {}
+
+    config_path = config_args.config
+
+    with config_path.open(
+        "r",
+        encoding="utf-8",
+    ) as f:
+        config = yaml.safe_load(f)
+
+    if config is None:
+        config = {}
+
+    if not isinstance(config, dict):
+        raise argparse.ArgumentTypeError(
+            "Pipeline config must contain a YAML mapping "
+            "at the top level"
+        )
+
+    return config_path, config
+
+
+
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
+    config_path, config_defaults = load_config_defaults(
+        argv,
+    )
+
     parser = argparse.ArgumentParser(
         prog="nanodeepcharuco",
         description=(
@@ -31,9 +85,28 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
             "OpenCV, ArUco Nano, or the NanoDeepCharuco hybrid detector."
         ),
     )
-    parser.add_argument("--videos", nargs=2, required=True, type=existing_file,
-                        metavar=("LEFT", "RIGHT"))
-    parser.add_argument("--board", required=True, type=existing_file)
+    parser.add_argument(
+        "--config",
+        type=existing_file,
+        default=config_path,
+        help=(
+            "YAML pipeline profile. Values from the profile become "
+            "defaults; explicit command-line options override them."
+        ),
+    )
+
+    parser.add_argument(
+        "--videos",
+        nargs=2,
+        required=("videos" not in config_defaults),
+        type=existing_file,
+        metavar=("LEFT", "RIGHT"),
+    )
+    parser.add_argument(
+        "--board",
+        required=("board" not in config_defaults),
+        type=existing_file,
+    )
     parser.add_argument("--detector", choices=("opencv", "nano", "hybrid"),
                         default="nano")
     parser.add_argument("--frames_start", type=int, default=0)
@@ -120,6 +193,46 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         ),
     )
     parser.add_argument(
+        "--stable_motion_mode",
+        choices=("fixed", "adaptive"),
+        default="fixed",
+        help=(
+            "Board-stability threshold mode. "
+            "'fixed' uses --stable_motion_px directly. "
+            "'adaptive' derives a threshold from the observed "
+            "motion distribution, with --stable_motion_px as "
+            "the minimum and --stable_motion_max_px as the cap."
+        ),
+    )
+    parser.add_argument(
+        "--stable_motion_percentile",
+        type=float,
+        default=25.0,
+        help=(
+            "Motion percentile used in adaptive board-stability "
+            "mode."
+        ),
+    )
+    parser.add_argument(
+        "--stable_motion_max_px",
+        type=float,
+        default=6.0,
+        help=(
+            "Hard upper limit for the automatically selected "
+            "board-motion threshold."
+        ),
+    )
+    parser.add_argument(
+        "--stable_min_pairs",
+        type=positive_int,
+        default=8,
+        help=(
+            "Minimum number of stereo pairs required after "
+            "board-stability filtering."
+        ),
+    )
+
+    parser.add_argument(
         "--stable_min_frames",
         type=positive_int,
         default=3,
@@ -132,7 +245,11 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
                         default=("omnidir", "omnidir"), dest="models",
                         metavar=("LEFT_MODEL", "RIGHT_MODEL"))
     parser.add_argument("--projection", default="perspective")
-    parser.add_argument("--data_path", required=True, type=Path)
+    parser.add_argument(
+        "--data_path",
+        required=("data_path" not in config_defaults),
+        type=Path,
+    )
     parser.add_argument("--nano_executable", type=Path,
                         default=PROJECT_ROOT / "third_party/aruco_nano/build/detect_batch")
     parser.add_argument("--deep_checkpoint", type=Path, default=None)
@@ -168,8 +285,102 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     )
     parser.add_argument("--calibcam_python", type=Path,
                         default=Path(sys.executable))
+    parser.add_argument(
+        "--calibcam_board",
+        type=Path,
+        default=None,
+        help=(
+            "Optional CalibCam-compatible serialization of the "
+            "same physical board. If omitted, --board is used."
+        ),
+    )
+    parser.add_argument(
+        "--calibcam_reject_outliers",
+        action="store_true",
+        help=(
+            "After Stage-2 CalibCam calibration, reject clearly "
+            "bad stereo pairs using final CalibCam residuals and "
+            "rerun the extrinsic calibration once."
+        ),
+    )
+    parser.add_argument(
+        "--calibcam_outlier_mad_multiplier",
+        type=float,
+        default=6.0,
+        help=(
+            "MAD multiplier for Stage-2 calibration outlier "
+            "detection."
+        ),
+    )
+    parser.add_argument(
+        "--calibcam_outlier_min_px",
+        type=float,
+        default=6.0,
+        help=(
+            "Minimum residual threshold for automatic "
+            "Stage-2 pair rejection."
+        ),
+    )
+    parser.add_argument(
+        "--calibcam_outlier_max_px",
+        type=float,
+        default=10.0,
+        help=(
+            "Maximum residual threshold for automatic "
+            "Stage-2 pair rejection."
+        ),
+    )
+
+    valid_config_keys = {
+        action.dest
+        for action in parser._actions
+        if action.dest
+        not in {
+            "help",
+            "config",
+        }
+    }
+
+    unknown_config_keys = (
+        set(config_defaults)
+        - valid_config_keys
+    )
+
+    if unknown_config_keys:
+        parser.error(
+            "Unknown config option(s): "
+            + ", ".join(
+                sorted(
+                    unknown_config_keys
+                )
+            )
+        )
+
+    parser.set_defaults(
+        **config_defaults
+    )
 
     args = parser.parse_args(argv)
+
+    if args.calibcam_outlier_mad_multiplier < 0:
+        parser.error(
+            "--calibcam_outlier_mad_multiplier "
+            "cannot be negative"
+        )
+
+    if args.calibcam_outlier_min_px < 0:
+        parser.error(
+            "--calibcam_outlier_min_px cannot be negative"
+        )
+
+    if (
+        args.calibcam_outlier_max_px
+        < args.calibcam_outlier_min_px
+    ):
+        parser.error(
+            "--calibcam_outlier_max_px cannot be smaller "
+            "than --calibcam_outlier_min_px"
+        )
 
     if args.stage1_calibration and args.stage1_intrinsics is not None:
         parser.error(
@@ -191,6 +402,27 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 
     if args.auto_sync and args.stable_min_frames < 2:
         parser.error("--stable_min_frames must be at least 2")
+
+    if (
+        args.auto_sync
+        and not 0.0
+        <= args.stable_motion_percentile
+        <= 100.0
+    ):
+        parser.error(
+            "--stable_motion_percentile must be between "
+            "0 and 100"
+        )
+
+    if (
+        args.auto_sync
+        and args.stable_motion_max_px
+        < args.stable_motion_px
+    ):
+        parser.error(
+            "--stable_motion_max_px cannot be smaller than "
+            "--stable_motion_px"
+        )
 
     if args.auto_sync and not args.sync_offsets:
         parser.error("--sync_offsets must contain at least one candidate offset")
@@ -235,6 +467,18 @@ def run_calibcam(args: argparse.Namespace, output_root: Path,
     calibcam_output = output_root / "calibcam_output"
     calibcam_python = str(resolved(args.calibcam_python))
 
+    calibcam_board_arg = getattr(
+        args,
+        "calibcam_board",
+        None,
+    )
+
+    calibcam_board = resolved(
+        calibcam_board_arg
+        if calibcam_board_arg is not None
+        else args.board
+    )
+
     if getattr(args, "stage1_calibration", False):
         for side, video, detection, model in zip(
             ("left", "right"),
@@ -254,7 +498,7 @@ def run_calibcam(args: argparse.Namespace, output_root: Path,
                 "--detection",
                 str(detection),
                 "--board",
-                str(args.board),
+                str(calibcam_board),
                 "--models",
                 model,
                 "--projection",
@@ -278,7 +522,7 @@ def run_calibcam(args: argparse.Namespace, output_root: Path,
         "--detection",
         *(str(path) for path in detection_paths),
         "--board",
-        str(args.board),
+        str(calibcam_board),
         "--models",
         *args.models,
         "--projection",
@@ -303,6 +547,298 @@ def run_calibcam(args: argparse.Namespace, output_root: Path,
             command.append("--calibration_multi")
 
     subprocess.run(command, check=True)
+
+    if (
+        args.stage1_intrinsics is not None
+        and getattr(
+            args,
+            "calibcam_reject_outliers",
+            False,
+        )
+    ):
+        import shutil
+
+        from nanodeepcharuco.calibcam.outlier_rejection import (
+            analyze_board_positions,
+            compare_extrinsics,
+            save_report,
+            write_cleaned_detection_payloads,
+        )
+
+        board_positions = (
+            calibcam_output
+            / "multicam_calibration_board_positions.yml"
+        )
+
+        initial_calibration = (
+            calibcam_output
+            / "multicam_calibration.yml"
+        )
+
+        report = analyze_board_positions(
+            board_positions,
+            mad_multiplier=(
+                args.calibcam_outlier_mad_multiplier
+            ),
+            min_threshold_px=(
+                args.calibcam_outlier_min_px
+            ),
+            max_threshold_px=(
+                args.calibcam_outlier_max_px
+            ),
+        )
+
+        report_path = (
+            output_root
+            / "calibcam_outlier_report.json"
+        )
+
+        print()
+        print("CalibCam Stage-2 outlier analysis")
+        print("---------------------------------")
+        print(
+            "pairs analyzed :",
+            report["n_pairs"],
+        )
+        print(
+            "median pair max:",
+            f'{report["median_pair_max_px"]:.3f}px',
+        )
+        print(
+            "MAD            :",
+            f'{report["mad_pair_max_px"]:.3f}px',
+        )
+        print(
+            "threshold      :",
+            f'{report["used_threshold_px"]:.3f}px',
+        )
+
+        rejected = report[
+            "rejected_indices"
+        ]
+
+        if not rejected:
+            print(
+                "rejected pairs : 0"
+            )
+
+            report["cleanup_performed"] = False
+
+            save_report(
+                report,
+                report_path,
+            )
+
+        else:
+            print(
+                "rejected pairs :",
+                len(rejected),
+            )
+
+            for pair in report["pairs"]:
+                if pair["rejected"]:
+                    print(
+                        f'  {pair["left_frame"]} -> '
+                        f'{pair["right_frame"]} '
+                        f'score='
+                        f'{pair["pair_score_px"]:.3f}px'
+                    )
+
+            remaining = (
+                report["n_pairs"]
+                - len(rejected)
+            )
+
+            if remaining < args.stable_min_pairs:
+                print(
+                    "Cleanup skipped: rejecting these pairs "
+                    "would leave only",
+                    remaining,
+                    "pairs; minimum required is",
+                    args.stable_min_pairs,
+                )
+
+                report[
+                    "cleanup_performed"
+                ] = False
+
+                report[
+                    "cleanup_skipped_reason"
+                ] = (
+                    "too_few_pairs_after_rejection"
+                )
+
+                save_report(
+                    report,
+                    report_path,
+                )
+
+            else:
+                cleaned_inputs = (
+                    output_root
+                    / "inputs_outlier_cleaned"
+                )
+
+                shutil.rmtree(
+                    cleaned_inputs,
+                    ignore_errors=True,
+                )
+
+                cleaned_detection_paths = (
+                    write_cleaned_detection_payloads(
+                        detection_paths,
+                        cleaned_inputs,
+                        rejected,
+                    )
+                )
+
+                cleaned_output = (
+                    output_root
+                    / "calibcam_output_cleaned"
+                )
+
+                shutil.rmtree(
+                    cleaned_output,
+                    ignore_errors=True,
+                )
+
+                cleaned_command = list(
+                    command
+                )
+
+                detection_idx = (
+                    cleaned_command.index(
+                        "--detection"
+                    )
+                )
+
+                cleaned_command[
+                    detection_idx + 1
+                ] = str(
+                    cleaned_detection_paths[0]
+                )
+
+                cleaned_command[
+                    detection_idx + 2
+                ] = str(
+                    cleaned_detection_paths[1]
+                )
+
+                data_idx = (
+                    cleaned_command.index(
+                        "--data_path"
+                    )
+                )
+
+                cleaned_command[
+                    data_idx + 1
+                ] = str(
+                    cleaned_output
+                )
+
+                print()
+                print(
+                    "Re-running CalibCam after "
+                    "outlier rejection..."
+                )
+
+                subprocess.run(
+                    cleaned_command,
+                    check=True,
+                )
+
+                cleaned_positions = (
+                    cleaned_output
+                    / "multicam_calibration_board_positions.yml"
+                )
+
+                cleaned_calibration = (
+                    cleaned_output
+                    / "multicam_calibration.yml"
+                )
+
+                cleaned_analysis = (
+                    analyze_board_positions(
+                        cleaned_positions,
+                        mad_multiplier=(
+                            args.calibcam_outlier_mad_multiplier
+                        ),
+                        min_threshold_px=(
+                            args.calibcam_outlier_min_px
+                        ),
+                        max_threshold_px=(
+                            args.calibcam_outlier_max_px
+                        ),
+                    )
+                )
+
+                geometry = compare_extrinsics(
+                    initial_calibration,
+                    cleaned_calibration,
+                )
+
+                report[
+                    "cleanup_performed"
+                ] = True
+
+                report[
+                    "remaining_pairs"
+                ] = remaining
+
+                report[
+                    "cleaned_detection_paths"
+                ] = [
+                    str(path)
+                    for path
+                    in cleaned_detection_paths
+                ]
+
+                report[
+                    "cleaned_calibration_output"
+                ] = str(
+                    cleaned_output
+                )
+
+                report[
+                    "cleaned_analysis"
+                ] = cleaned_analysis
+
+                report[
+                    "geometry_comparison"
+                ] = geometry
+
+                save_report(
+                    report,
+                    report_path,
+                )
+
+                print()
+                print(
+                    "Cleaned Stage-2 calibration"
+                )
+                print(
+                    "---------------------------"
+                )
+                print(
+                    "remaining pairs:",
+                    remaining,
+                )
+                print(
+                    "baseline change:",
+                    f'{geometry["baseline_change_mm"]:+.3f} mm',
+                )
+                print(
+                    "rotation change:",
+                    f'{geometry["rotation_change_deg"]:+.3f} deg',
+                )
+                print(
+                    "cleaned output:",
+                    cleaned_output,
+                )
+                print(
+                    "outlier report:",
+                    report_path,
+                )
 
 
 def main(argv: list[str] | None = None) -> int:
