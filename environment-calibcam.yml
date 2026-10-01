@@ -1,0 +1,19 @@
+name: calibcam_baseline_420
+
+channels:
+  - conda-forge
+
+dependencies:
+  - python=3.10.21
+  - pip
+  - pip:
+      - numpy==1.23.5
+      - scipy==1.10.1
+      - pandas==2.3.3
+      - jax==0.4.18
+      - jaxlib==0.4.18
+      - opencv-contrib-python-headless==4.11.0.86
+      - bbo-ccvtools==1.2.10
+      - bbo-svidreader==0.8.1
+      - bbo-calibcam==4.2.0
+      - git+https://github.com/bbo-lab/calibcamlib.git@5e3888b0647a4e20cf54ec54734ec6ed770a2169

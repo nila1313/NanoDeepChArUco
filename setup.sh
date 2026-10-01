@@ -5,6 +5,7 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$ROOT"
 
 PROJECT_ENV="nanodeepcharuco"
+CALIBCAM_ENV="calibcam_baseline_420"
 
 section() {
     echo
@@ -13,7 +14,7 @@ section() {
     echo "============================================================"
 }
 
-section "1/6 Checking tools"
+section "1/7 Checking tools"
 
 command -v git >/dev/null 2>&1 || {
     echo "ERROR: git is required."
@@ -25,7 +26,7 @@ command -v conda >/dev/null 2>&1 || {
     exit 1
 }
 
-section "2/6 Preparing Python environment"
+section "2/7 Preparing Python environment"
 
 if conda env list | awk 'NF && $1 !~ /^#/ {print $1}' \
     | grep -qx "$PROJECT_ENV"; then
@@ -38,12 +39,25 @@ else
     conda env create -f environment.yml
 fi
 
-section "3/6 Fetching Git LFS assets"
+section "3/7 Preparing CalibCam environment"
+
+if conda env list | awk 'NF && $1 !~ /^#/ {print $1}' \
+    | grep -qx "$CALIBCAM_ENV"; then
+
+    conda env update \
+        -n "$CALIBCAM_ENV" \
+        -f environment-calibcam.yml \
+        --prune
+else
+    conda env create -f environment-calibcam.yml
+fi
+
+section "4/7 Fetching Git LFS assets"
 
 conda run -n "$PROJECT_ENV" git lfs install
 conda run -n "$PROJECT_ENV" git lfs pull
 
-section "4/6 Initializing DeepChArUco"
+section "5/7 Initializing DeepChArUco"
 
 git submodule update --init --recursive
 
@@ -60,17 +74,20 @@ if [[ "$ACTUAL_DEEPCHARUCO_COMMIT" != "$EXPECTED_DEEPCHARUCO_COMMIT" ]]; then
     exit 1
 fi
 
-section "5/6 Building ArUco Nano"
+section "6/7 Building ArUco Nano"
 
 bash scripts/build_nano.sh
 
-section "6/6 Verifying installation"
+section "7/7 Verifying installation"
 
 conda run -n "$PROJECT_ENV" \
     nanodeepcharuco --help >/dev/null
 
 conda run -n "$PROJECT_ENV" \
     pytest -q
+
+conda run -n "$CALIBCAM_ENV" \
+    python -c "import calibcam, calibcamlib, numpy; print('CalibCam', calibcam.__version__, 'calibcamlib', calibcamlib.__version__, 'NumPy', numpy.__version__)"
 
 echo
 echo "READY"
