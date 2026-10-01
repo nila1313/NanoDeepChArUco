@@ -35,6 +35,45 @@ from nanodeepcharuco.sync.stability import (
 MIN_FINAL_SHARED_CORNERS = 5
 
 
+def _expand_frames_for_stability(
+    frame_map: dict[int, int],
+    frame_count: int,
+    min_stable_frames: int,
+) -> dict[int, int]:
+    """
+    Add consecutive physical-frame neighbors around sparse
+    synchronization samples so board stability can be measured.
+
+    Example:
+        sync samples 20, 40
+        min_stable_frames = 3
+
+        detected physical frames become:
+        19, 20, 21, 39, 40, 41
+    """
+    radius = max(
+        1,
+        (int(min_stable_frames) - 1 + 1) // 2,
+    )
+
+    expanded = set()
+
+    for frame in frame_map:
+        for delta in range(
+            -radius,
+            radius + 1,
+        ):
+            physical = int(frame) + delta
+
+            if 0 <= physical < int(frame_count):
+                expanded.add(physical)
+
+    return {
+        frame: frame
+        for frame in sorted(expanded)
+    }
+
+
 def _video_frame_count(video_path: str | Path) -> int:
     cap = cv2.VideoCapture(str(video_path))
 
@@ -107,7 +146,7 @@ def run_auto_sync_stage2(
             int(args.frames_end),
         )
 
-    left_map, right_map = (
+    left_sync_map, right_sync_map = (
         build_auto_sync_detection_maps(
             frames_start=args.frames_start,
             frames_end=reference_end,
@@ -118,6 +157,18 @@ def run_auto_sync_stage2(
         )
     )
 
+    left_map = _expand_frames_for_stability(
+        left_sync_map,
+        left_count,
+        args.stable_min_frames,
+    )
+
+    right_map = _expand_frames_for_stability(
+        right_sync_map,
+        right_count,
+        args.stable_min_frames,
+    )
+
     print()
     print("Automatic synchronization discovery")
     print("-----------------------------------")
@@ -126,11 +177,19 @@ def run_auto_sync_stage2(
         list(args.sync_offsets),
     )
     print(
-        "left discovery frames :",
+        "left sync frames       :",
+        len(left_sync_map),
+    )
+    print(
+        "right sync frames      :",
+        len(right_sync_map),
+    )
+    print(
+        "left detected frames   :",
         len(left_map),
     )
     print(
-        "right discovery frames:",
+        "right detected frames  :",
         len(right_map),
     )
 
@@ -148,9 +207,21 @@ def run_auto_sync_stage2(
         "right_sync",
     )
 
+    left_sync_by_frame = {
+        frame: left_by_frame[frame]
+        for frame in left_sync_map
+        if frame in left_by_frame
+    }
+
+    right_sync_by_frame = {
+        frame: right_by_frame[frame]
+        for frame in right_sync_map
+        if frame in right_by_frame
+    }
+
     window_results = search_windowed_offsets(
-        left_by_frame=left_by_frame,
-        right_by_frame=right_by_frame,
+        left_by_frame=left_sync_by_frame,
+        right_by_frame=right_sync_by_frame,
         offsets=list(args.sync_offsets),
         window_size=args.sync_window_size,
         window_step=args.sync_window_step,

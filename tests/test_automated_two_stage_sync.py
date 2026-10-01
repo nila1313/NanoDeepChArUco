@@ -183,3 +183,27 @@ def test_selected_payload_keeps_logical_and_physical_indices_separate():
         401,
         421,
     ]]
+
+
+def test_stability_expansion_adds_neighboring_physical_frames():
+    from nanodeepcharuco.pipeline.auto_sync import (
+        _expand_frames_for_stability,
+    )
+
+    expanded = _expand_frames_for_stability(
+        {
+            20: 20,
+            40: 40,
+        },
+        frame_count=100,
+        min_stable_frames=3,
+    )
+
+    assert list(expanded) == [
+        19,
+        20,
+        21,
+        39,
+        40,
+        41,
+    ]
