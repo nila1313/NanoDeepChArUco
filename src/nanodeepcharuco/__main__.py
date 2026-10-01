@@ -42,6 +42,73 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--frames_offsets", "--frames_offset", nargs=2, type=int,
                         default=(0, 0), dest="frames_offsets",
                         metavar=("LEFT_OFFSET", "RIGHT_OFFSET"))
+
+    parser.add_argument(
+        "--auto_sync",
+        action="store_true",
+        help=(
+            "Automatically estimate trusted stereo synchronization "
+            "for two-camera Stage-2 calibration."
+        ),
+    )
+    parser.add_argument(
+        "--sync_offsets",
+        nargs="+",
+        type=int,
+        default=(-3, -2, -1, 0, 1, 2, 3),
+        help=(
+            "Candidate right-camera offsets for automatic synchronization."
+        ),
+    )
+    parser.add_argument(
+        "--sync_frame_step",
+        type=positive_int,
+        default=1,
+        help=(
+            "Physical-frame sampling step used during synchronization discovery."
+        ),
+    )
+    parser.add_argument(
+        "--sync_window_size",
+        type=positive_int,
+        default=400,
+        help="Synchronization window size in frames.",
+    )
+    parser.add_argument(
+        "--sync_window_step",
+        type=positive_int,
+        default=200,
+        help="Synchronization window step in frames.",
+    )
+    parser.add_argument(
+        "--sync_min_inlier_ratio",
+        type=float,
+        default=0.20,
+        help="Minimum epipolar inlier ratio for a trusted sync window.",
+    )
+    parser.add_argument(
+        "--sync_min_ratio_gap",
+        type=float,
+        default=0.05,
+        help=(
+            "Minimum inlier-ratio advantage over the second-best offset."
+        ),
+    )
+    parser.add_argument(
+        "--sync_min_persistence",
+        type=positive_int,
+        default=2,
+        help="Minimum number of supporting windows for a stable sync segment.",
+    )
+    parser.add_argument(
+        "--sync_max_gap_frames",
+        type=int,
+        default=400,
+        help=(
+            "Maximum frame gap allowed between supporting windows "
+            "of the same offset."
+        ),
+    )
     parser.add_argument("--models", "--model", nargs=2,
                         default=("omnidir", "omnidir"), dest="models",
                         metavar=("LEFT_MODEL", "RIGHT_MODEL"))
@@ -90,6 +157,18 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
             "--stage1_calibration and --stage1_intrinsics "
             "cannot be used together"
         )
+
+    if args.auto_sync and args.stage1_calibration:
+        parser.error(
+            "--auto_sync is intended for Stage 2 stereo calibration, "
+            "not independent Stage-1 intrinsic calibration"
+        )
+
+    if args.auto_sync and args.sync_max_gap_frames < 0:
+        parser.error("--sync_max_gap_frames cannot be negative")
+
+    if args.auto_sync and not args.sync_offsets:
+        parser.error("--sync_offsets must contain at least one candidate offset")
 
     return args
 
@@ -213,30 +292,71 @@ def main(argv: list[str] | None = None) -> int:
         make_detector(args, "left", output_root),
         make_detector(args, "right", output_root),
     )
-    camera_data = []
-    for side, video, detector, offset in zip(
-        ("left", "right"), args.videos, detectors, args.frames_offsets
-    ):
-        camera_data.append(run_detector_on_video(
-            video, detector, args.frames_step, side,
-            frames_start=args.frames_start, frames_end=args.frames_end,
-            frame_offset=offset,
-        ))
-
-    detection_paths = (inputs_dir / "detection_000.npy",
-                       inputs_dir / "detection_001.npy")
-    for data, path, offset in zip(
-        camera_data,
-        detection_paths,
-        args.frames_offsets,
-    ):
-        build_and_save_payload(
-            data,
-            path,
-            frame_offset=offset,
-            frames_start=args.frames_start,
-            frames_step=args.frames_step,
+    if args.auto_sync:
+        from nanodeepcharuco.pipeline.auto_sync import (
+            run_auto_sync_stage2,
         )
+
+        (
+            detection_paths,
+            synchronized_pairs,
+            sync_segments,
+            sync_windows,
+        ) = run_auto_sync_stage2(
+            args=args,
+            detectors=detectors,
+            output_root=output_root,
+        )
+
+        camera_data = [
+            {
+                pair.left_frame: {}
+                for pair in synchronized_pairs
+            },
+            {
+                pair.right_frame: {}
+                for pair in synchronized_pairs
+            },
+        ]
+
+    else:
+        camera_data = []
+
+        for side, video, detector, offset in zip(
+            ("left", "right"),
+            args.videos,
+            detectors,
+            args.frames_offsets,
+        ):
+            camera_data.append(
+                run_detector_on_video(
+                    video,
+                    detector,
+                    args.frames_step,
+                    side,
+                    frames_start=args.frames_start,
+                    frames_end=args.frames_end,
+                    frame_offset=offset,
+                )
+            )
+
+        detection_paths = (
+            inputs_dir / "detection_000.npy",
+            inputs_dir / "detection_001.npy",
+        )
+
+        for data, path, offset in zip(
+            camera_data,
+            detection_paths,
+            args.frames_offsets,
+        ):
+            build_and_save_payload(
+                data,
+                path,
+                frame_offset=offset,
+                frames_start=args.frames_start,
+                frames_step=args.frames_step,
+            )
 
     manifest = {
         "pipeline": "NanoDeepCharuco_Basic", "detector": args.detector,

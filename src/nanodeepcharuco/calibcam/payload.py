@@ -159,3 +159,73 @@ def load_calibcam_detection(
         path,
         allow_pickle=True,
     ).item()
+
+
+def build_calibcam_dict_from_selected_frames(
+    side_data: dict[int, dict[int, np.ndarray]],
+    physical_frames: list[int],
+    detection_idxs: list[int],
+) -> dict:
+    """
+    Build a CalibCam payload from explicitly selected physical frames.
+
+    The same detection_idx is used by left and right cameras for one
+    synchronized stereo observation, while frame_idxs preserve the
+    real physical video-frame numbers.
+    """
+    if len(physical_frames) != len(detection_idxs):
+        raise ValueError(
+            "physical_frames and detection_idxs must have equal length"
+        )
+
+    marker_ids = sorted({
+        int(marker_id)
+        for frame_id in physical_frames
+        for marker_id in side_data.get(int(frame_id), {})
+    })
+
+    id_to_col = {
+        marker_id: idx
+        for idx, marker_id in enumerate(marker_ids)
+    }
+
+    coords = np.full(
+        (
+            len(physical_frames),
+            len(marker_ids),
+            2,
+        ),
+        np.nan,
+        dtype=np.float32,
+    )
+
+    for row, frame_id in enumerate(physical_frames):
+        frame_id = int(frame_id)
+
+        corners = side_data.get(
+            frame_id,
+            {},
+        )
+
+        for marker_id, xy in corners.items():
+            col = id_to_col[int(marker_id)]
+
+            coords[row, col, :] = np.asarray(
+                xy,
+                dtype=np.float32,
+            )
+
+    return {
+        "version": "2.0",
+        "storage_method": "array",
+        "marker_coords": [coords.tolist()],
+        "marker_ids": marker_ids,
+        "detection_idxs": [
+            int(idx)
+            for idx in detection_idxs
+        ],
+        "frame_idxs": [[
+            int(frame_id)
+            for frame_id in physical_frames
+        ]],
+    }
