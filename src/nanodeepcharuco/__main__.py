@@ -109,6 +109,25 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
             "of the same offset."
         ),
     )
+
+    parser.add_argument(
+        "--stable_motion_px",
+        type=float,
+        default=2.0,
+        help=(
+            "Maximum median ChArUco-corner motion in pixels "
+            "for a frame transition to count as board-stable."
+        ),
+    )
+    parser.add_argument(
+        "--stable_min_frames",
+        type=positive_int,
+        default=3,
+        help=(
+            "Minimum number of consecutive physical frames "
+            "required for a stable board interval."
+        ),
+    )
     parser.add_argument("--models", "--model", nargs=2,
                         default=("omnidir", "omnidir"), dest="models",
                         metavar=("LEFT_MODEL", "RIGHT_MODEL"))
@@ -166,6 +185,12 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 
     if args.auto_sync and args.sync_max_gap_frames < 0:
         parser.error("--sync_max_gap_frames cannot be negative")
+
+    if args.auto_sync and args.stable_motion_px < 0:
+        parser.error("--stable_motion_px cannot be negative")
+
+    if args.auto_sync and args.stable_min_frames < 2:
+        parser.error("--stable_min_frames must be at least 2")
 
     if args.auto_sync and not args.sync_offsets:
         parser.error("--sync_offsets must contain at least one candidate offset")

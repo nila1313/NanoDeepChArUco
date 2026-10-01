@@ -26,6 +26,10 @@ from nanodeepcharuco.sync.pairing import (
 from nanodeepcharuco.sync.reporting import (
     save_sync_reports,
 )
+from nanodeepcharuco.sync.stability import (
+    find_stable_board_segments,
+    filter_pairs_by_board_stability,
+)
 
 
 MIN_FINAL_SHARED_CORNERS = 5
@@ -230,10 +234,82 @@ def run_auto_sync_stage2(
         right_by_frame,
     )
 
+    left_stable_segments = (
+        find_stable_board_segments(
+            left_by_frame,
+            motion_threshold_px=(
+                args.stable_motion_px
+            ),
+            min_stable_frames=(
+                args.stable_min_frames
+            ),
+        )
+    )
+
+    right_stable_segments = (
+        find_stable_board_segments(
+            right_by_frame,
+            motion_threshold_px=(
+                args.stable_motion_px
+            ),
+            min_stable_frames=(
+                args.stable_min_frames
+            ),
+        )
+    )
+
+    print()
+    print("Stable board intervals")
+    print("----------------------")
+    print(
+        "left stable segments :",
+        len(left_stable_segments),
+    )
+    print(
+        "right stable segments:",
+        len(right_stable_segments),
+    )
+
+    for segment in left_stable_segments:
+        print(
+            "left ",
+            f"{segment.start_frame}-"
+            f"{segment.end_frame - 1}",
+            f"mean_motion="
+            f"{segment.mean_motion_px:.3f}px",
+        )
+
+    for segment in right_stable_segments:
+        print(
+            "right",
+            f"{segment.start_frame}-"
+            f"{segment.end_frame - 1}",
+            f"mean_motion="
+            f"{segment.mean_motion_px:.3f}px",
+        )
+
+    pairs_before_stability = len(pairs)
+
+    pairs = filter_pairs_by_board_stability(
+        pairs,
+        left_stable_segments,
+        right_stable_segments,
+    )
+
+    print(
+        "pairs before stability filter:",
+        pairs_before_stability,
+    )
+    print(
+        "pairs after stability filter :",
+        len(pairs),
+    )
+
     if not pairs:
         raise RuntimeError(
             "Synchronization succeeded, but no "
-            "usable stereo pairs remained."
+            "stereo pairs remained after the "
+            "stable-board filter."
         )
 
     print()
