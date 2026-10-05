@@ -89,6 +89,12 @@ conda run -n "$PROJECT_ENV" \
 conda run -n "$CALIBCAM_ENV" \
     python -c "import calibcam, calibcamlib, numpy; print('CalibCam', calibcam.__version__, 'calibcamlib', calibcamlib.__version__, 'NumPy', numpy.__version__)"
 
+
+CALIBCAM_BOARD="configs/boards/small_5x6_dict6x6_250_meters_numpy1_compatible.npy"
+
+conda run -n "$CALIBCAM_ENV" \
+    python -c "import numpy as np; p='$CALIBCAM_BOARD'; b=np.load(p, allow_pickle=True)[()]; assert int(b['boardWidth']) == 5; assert int(b['boardHeight']) == 6; assert int(b['dictionary_type']) == 10; assert float(b['square_size_real']) == 0.02; print('CalibCam board serialization OK:', p)"
+
 echo
 echo "READY"
 echo

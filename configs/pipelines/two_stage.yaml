@@ -6,6 +6,9 @@
 
 board: configs/boards/small_5x6_dict6x6_250_meters.npy
 
+# Same physical board, serialized with NumPy 1.x for CalibCam 4.2.
+calibcam_board: configs/boards/small_5x6_dict6x6_250_meters_numpy1_compatible.npy
+
 detector: hybrid
 
 deep_checkpoint: models/deepcharuco/small_5x6/detector.ckpt

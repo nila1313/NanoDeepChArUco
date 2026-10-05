@@ -116,3 +116,46 @@ def test_cli_overrides_pipeline_config(
         args.stable_motion_mode
         == "fixed"
     )
+
+
+
+def test_pipeline_config_supplies_calibcam_board(
+    tmp_path,
+):
+    left = touch(tmp_path / "left.MP4")
+    right = touch(tmp_path / "right.MP4")
+    board = touch(tmp_path / "board.npy")
+    calibcam_board = touch(
+        tmp_path / "board_numpy1.npy"
+    )
+
+    config = tmp_path / "pipeline.yaml"
+
+    config.write_text(
+        yaml.safe_dump(
+            {
+                "board": str(board),
+                "calibcam_board": str(
+                    calibcam_board
+                ),
+            }
+        )
+    )
+
+    args = parse_args(
+        [
+            "--config",
+            str(config),
+            "--videos",
+            str(left),
+            str(right),
+            "--data_path",
+            str(tmp_path / "run"),
+        ]
+    )
+
+    assert args.board == board.resolve()
+    assert (
+        args.calibcam_board
+        == calibcam_board.resolve()
+    )

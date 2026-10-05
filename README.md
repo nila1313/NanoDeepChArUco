@@ -86,10 +86,15 @@ Two board definitions are included:
 ```text
 configs/boards/
 ├── large_7x7_dict4x4_50.npy
-└── small_5x6_dict6x6_250_meters.npy
+├── small_5x6_dict6x6_250_meters.npy
+└── small_5x6_dict6x6_250_meters_numpy1_compatible.npy
 ```
 
 The small board uses `DICT_6X6_250`.
+
+`small_5x6_dict6x6_250_meters_numpy1_compatible.npy` describes the
+same physical small board, but is serialized for the pinned
+CalibCam 4.2 / NumPy 1.x environment.
 
 The large board uses `DICT_4X4_50`.
 
@@ -105,9 +110,12 @@ python -m nanodeepcharuco \
   --frames_end FRAME_COUNT \
   --device cuda \
   --calibcam_python /path/to/calibcam/python \
-  --calibcam_board /path/to/calibcam_compatible_board.npy \
   --data_path runs/my_calibration
 ```
+
+The automated two-stage profile already selects the included
+NumPy-1-compatible CalibCam board. Use `--calibcam_board` only
+when intentionally overriding that default.
 
 Use `mps` instead of `cuda` on Apple Silicon, or `cpu` when no supported GPU is available.
 
