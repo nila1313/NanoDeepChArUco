@@ -54,6 +54,7 @@ class NanoDeepCharucoDetector:
         nano_executable: str | Path,
         deep_detector: DeepCharucoDetector,
         work_dir: str | Path,
+        keep_work: bool = False,
     ):
         self.board_path = (
             Path(board_path)
@@ -71,6 +72,8 @@ class NanoDeepCharucoDetector:
             parents=True,
             exist_ok=True,
         )
+
+        self.keep_work = bool(keep_work)
 
         self.board_params = load_board_parameters(
             self.board_path
@@ -217,6 +220,12 @@ class NanoDeepCharucoDetector:
             )
             for c in charuco
         }
+
+        if not self.keep_work:
+            shutil.rmtree(
+                input_dir,
+                ignore_errors=True,
+            )
 
         return (
             coords,

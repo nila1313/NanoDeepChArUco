@@ -257,6 +257,14 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
                         default=PROJECT_ROOT / "models/refinenet/refinenet.ckpt")
     parser.add_argument("--deep_config", type=Path, default=None)
     parser.add_argument("--device", choices=("cpu", "cuda", "mps"), default=None)
+    parser.add_argument(
+        "--keep_work",
+        action="store_true",
+        help=(
+            "Keep temporary per-frame Nano detector directories for "
+            "debugging. By default they are removed after detection."
+        ),
+    )
     parser.add_argument("--run_calibcam", action="store_true",
                         help="Run CalibCam after generating detection payloads.")
     parser.add_argument("--calibration_single", action="store_true",
@@ -443,7 +451,12 @@ def make_detector(args: argparse.Namespace, side: str, output_root: Path):
     work_dir = output_root / "work" / side
     if args.detector == "nano":
         from nanodeepcharuco.detection.nano_charuco import NanoCharucoDetector
-        return NanoCharucoDetector(args.board, nano_executable, work_dir)
+        return NanoCharucoDetector(
+            args.board,
+            nano_executable,
+            work_dir,
+            keep_work=args.keep_work,
+        )
 
     if args.deep_checkpoint is None:
         raise ValueError("--deep_checkpoint is required for the hybrid detector")
@@ -459,7 +472,13 @@ def make_detector(args: argparse.Namespace, side: str, output_root: Path):
         config_path=resolved(args.deep_config),
         device=args.device,
     ).load()
-    return NanoDeepCharucoDetector(args.board, nano_executable, deep, work_dir)
+    return NanoDeepCharucoDetector(
+        args.board,
+        nano_executable,
+        deep,
+        work_dir,
+        keep_work=args.keep_work,
+    )
 
 
 def run_calibcam(args: argparse.Namespace, output_root: Path,
