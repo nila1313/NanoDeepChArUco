@@ -1,0 +1,513 @@
+from __future__ import annotations
+
+from pathlib import Path
+
+import cv2
+
+from nanodeepcharuco.calibcam.payload import (
+    build_calibcam_dict_from_selected_frames,
+    save_calibcam_detection,
+)
+from nanodeepcharuco.pipeline.detection_runner import (
+    run_detector_on_frames,
+)
+from nanodeepcharuco.sync.schedule import (
+    build_auto_sync_detection_maps,
+)
+from nanodeepcharuco.sync.windowed import (
+    search_windowed_offsets,
+)
+from nanodeepcharuco.sync.segments import (
+    build_sync_segments,
+)
+from nanodeepcharuco.sync.pairing import (
+    build_synchronized_pairs,
+)
+from nanodeepcharuco.sync.reporting import (
+    save_sync_reports,
+)
+from nanodeepcharuco.sync.stability import (
+    find_stable_board_segments,
+    filter_pairs_by_board_stability,
+    select_motion_threshold,
+)
+
+
+MIN_FINAL_SHARED_CORNERS = 5
+
+
+def _expand_frames_for_stability(
+    frame_map: dict[int, int],
+    frame_count: int,
+    min_stable_frames: int,
+) -> dict[int, int]:
+    """
+    Add consecutive physical-frame neighbors around sparse
+    synchronization samples so board stability can be measured.
+
+    Example:
+        sync samples 20, 40
+        min_stable_frames = 3
+
+        detected physical frames become:
+        19, 20, 21, 39, 40, 41
+    """
+    radius = max(
+        1,
+        (int(min_stable_frames) - 1 + 1) // 2,
+    )
+
+    expanded = set()
+
+    for frame in frame_map:
+        for delta in range(
+            -radius,
+            radius + 1,
+        ):
+            physical = int(frame) + delta
+
+            if 0 <= physical < int(frame_count):
+                expanded.add(physical)
+
+    return {
+        frame: frame
+        for frame in sorted(expanded)
+    }
+
+
+def _video_frame_count(video_path: str | Path) -> int:
+    cap = cv2.VideoCapture(str(video_path))
+
+    if not cap.isOpened():
+        raise RuntimeError(
+            f"Could not open video: {video_path}"
+        )
+
+    try:
+        return int(
+            cap.get(cv2.CAP_PROP_FRAME_COUNT)
+        )
+    finally:
+        cap.release()
+
+
+def _filter_usable_pairs(
+    pairs,
+    left_by_frame,
+    right_by_frame,
+    min_shared_corners: int = MIN_FINAL_SHARED_CORNERS,
+):
+    usable = []
+
+    for pair in pairs:
+        left = left_by_frame.get(
+            pair.left_frame,
+            {},
+        )
+
+        right = right_by_frame.get(
+            pair.right_frame,
+            {},
+        )
+
+        shared = (
+            set(left)
+            & set(right)
+        )
+
+        if len(shared) < min_shared_corners:
+            continue
+
+        usable.append(pair)
+
+    return usable
+
+
+def run_auto_sync_stage2(
+    args,
+    detectors,
+    output_root: Path,
+):
+    left_count = _video_frame_count(
+        args.videos[0]
+    )
+
+    right_count = _video_frame_count(
+        args.videos[1]
+    )
+
+    reference_end = min(
+        left_count,
+        right_count,
+    )
+
+    if args.frames_end is not None:
+        reference_end = min(
+            reference_end,
+            int(args.frames_end),
+        )
+
+    left_sync_map, right_sync_map = (
+        build_auto_sync_detection_maps(
+            frames_start=args.frames_start,
+            frames_end=reference_end,
+            frames_step=args.sync_frame_step,
+            offsets=list(args.sync_offsets),
+            left_frame_count=left_count,
+            right_frame_count=right_count,
+        )
+    )
+
+    left_map = _expand_frames_for_stability(
+        left_sync_map,
+        left_count,
+        args.stable_min_frames,
+    )
+
+    right_map = _expand_frames_for_stability(
+        right_sync_map,
+        right_count,
+        args.stable_min_frames,
+    )
+
+    print()
+    print("Automatic synchronization discovery")
+    print("-----------------------------------")
+    print(
+        "candidate offsets:",
+        list(args.sync_offsets),
+    )
+    print(
+        "left sync frames       :",
+        len(left_sync_map),
+    )
+    print(
+        "right sync frames      :",
+        len(right_sync_map),
+    )
+    print(
+        "left detected frames   :",
+        len(left_map),
+    )
+    print(
+        "right detected frames  :",
+        len(right_map),
+    )
+
+    left_by_frame = run_detector_on_frames(
+        args.videos[0],
+        detectors[0],
+        left_map.keys(),
+        "left_sync",
+    )
+
+    right_by_frame = run_detector_on_frames(
+        args.videos[1],
+        detectors[1],
+        right_map.keys(),
+        "right_sync",
+    )
+
+    left_sync_by_frame = {
+        frame: left_by_frame[frame]
+        for frame in left_sync_map
+        if frame in left_by_frame
+    }
+
+    right_sync_by_frame = {
+        frame: right_by_frame[frame]
+        for frame in right_sync_map
+        if frame in right_by_frame
+    }
+
+    window_results = search_windowed_offsets(
+        left_by_frame=left_sync_by_frame,
+        right_by_frame=right_sync_by_frame,
+        offsets=list(args.sync_offsets),
+        window_size=args.sync_window_size,
+        window_step=args.sync_window_step,
+        min_shared_per_frame=6,
+        ransac_threshold_px=1.5,
+        min_frame_pairs=4,
+    )
+
+    print()
+    print("Synchronization windows")
+    print("-----------------------")
+
+    for result in window_results:
+        if result.best_score is None:
+            print(
+                f"{result.start_frame}-"
+                f"{result.end_frame - 1}: "
+                "no trusted candidate"
+            )
+            continue
+
+        print(
+            f"{result.start_frame}-"
+            f"{result.end_frame - 1}: "
+            f"offset={result.best_offset:+d} "
+            f"inlier_ratio="
+            f"{result.best_score.inlier_ratio:.4f} "
+            f"gap="
+            f"{result.inlier_ratio_gap:.4f}"
+        )
+
+    segments = build_sync_segments(
+        window_results,
+        min_inlier_ratio=args.sync_min_inlier_ratio,
+        min_ratio_gap=args.sync_min_ratio_gap,
+        min_persistence=args.sync_min_persistence,
+        max_gap_frames=args.sync_max_gap_frames,
+    )
+
+    if not segments:
+        raise RuntimeError(
+            "Automatic synchronization found no "
+            "trusted stable synchronization segments."
+        )
+
+    print()
+    print("Trusted synchronization segments")
+    print("--------------------------------")
+
+    for segment in segments:
+        print(
+            f"{segment.start_frame}-"
+            f"{segment.end_frame - 1}: "
+            f"offset={segment.offset:+d} "
+            f"support={segment.n_support_windows}"
+        )
+
+    calibration_left_frames = [
+        frame
+        for frame in range(
+            int(args.frames_start),
+            int(reference_end),
+            int(args.frames_step),
+        )
+        if frame in left_by_frame
+    ]
+
+    pairs = build_synchronized_pairs(
+        left_frames=calibration_left_frames,
+        right_frames=sorted(right_by_frame),
+        segments=segments,
+        require_right_available=True,
+        window_results=window_results,
+        min_inlier_ratio=args.sync_min_inlier_ratio,
+        min_ratio_gap=args.sync_min_ratio_gap,
+    )
+
+    pairs = _filter_usable_pairs(
+        pairs,
+        left_by_frame,
+        right_by_frame,
+    )
+
+    left_motion_threshold = (
+        select_motion_threshold(
+            left_by_frame,
+            mode=args.stable_motion_mode,
+            fixed_threshold_px=(
+                args.stable_motion_px
+            ),
+            percentile=(
+                args.stable_motion_percentile
+            ),
+            max_threshold_px=(
+                args.stable_motion_max_px
+            ),
+        )
+    )
+
+    right_motion_threshold = (
+        select_motion_threshold(
+            right_by_frame,
+            mode=args.stable_motion_mode,
+            fixed_threshold_px=(
+                args.stable_motion_px
+            ),
+            percentile=(
+                args.stable_motion_percentile
+            ),
+            max_threshold_px=(
+                args.stable_motion_max_px
+            ),
+        )
+    )
+
+    print()
+    print("Board-stability thresholds")
+    print("--------------------------")
+    print(
+        "mode:",
+        args.stable_motion_mode,
+    )
+    print(
+        "left threshold :",
+        f"{left_motion_threshold:.3f}px",
+    )
+    print(
+        "right threshold:",
+        f"{right_motion_threshold:.3f}px",
+    )
+
+    left_stable_segments = (
+        find_stable_board_segments(
+            left_by_frame,
+            motion_threshold_px=(
+                left_motion_threshold
+            ),
+            min_stable_frames=(
+                args.stable_min_frames
+            ),
+        )
+    )
+
+    right_stable_segments = (
+        find_stable_board_segments(
+            right_by_frame,
+            motion_threshold_px=(
+                right_motion_threshold
+            ),
+            min_stable_frames=(
+                args.stable_min_frames
+            ),
+        )
+    )
+
+    print()
+    print("Stable board intervals")
+    print("----------------------")
+    print(
+        "left stable segments :",
+        len(left_stable_segments),
+    )
+    print(
+        "right stable segments:",
+        len(right_stable_segments),
+    )
+
+    for segment in left_stable_segments:
+        print(
+            "left ",
+            f"{segment.start_frame}-"
+            f"{segment.end_frame - 1}",
+            f"mean_motion="
+            f"{segment.mean_motion_px:.3f}px",
+        )
+
+    for segment in right_stable_segments:
+        print(
+            "right",
+            f"{segment.start_frame}-"
+            f"{segment.end_frame - 1}",
+            f"mean_motion="
+            f"{segment.mean_motion_px:.3f}px",
+        )
+
+    pairs_before_stability = len(pairs)
+
+    pairs = filter_pairs_by_board_stability(
+        pairs,
+        left_stable_segments,
+        right_stable_segments,
+    )
+
+    print(
+        "pairs before stability filter:",
+        pairs_before_stability,
+    )
+    print(
+        "pairs after stability filter :",
+        len(pairs),
+    )
+
+    if len(pairs) < args.stable_min_pairs:
+        raise RuntimeError(
+            "Synchronization succeeded, but only "
+            f"{len(pairs)} stereo pairs remained after the "
+            "stable-board filter; at least "
+            f"{args.stable_min_pairs} are required."
+        )
+
+    print()
+    print("Final synchronized Stage-2 sampling")
+    print("-----------------------------------")
+    print(
+        "usable stereo pairs:",
+        len(pairs),
+    )
+
+    inputs_dir = output_root / "inputs"
+
+    inputs_dir.mkdir(
+        parents=True,
+        exist_ok=True,
+    )
+
+    left_path = (
+        inputs_dir
+        / "detection_000.npy"
+    )
+
+    right_path = (
+        inputs_dir
+        / "detection_001.npy"
+    )
+
+    detection_ids = list(
+        range(len(pairs))
+    )
+
+    left_frames = [
+        pair.left_frame
+        for pair in pairs
+    ]
+
+    right_frames = [
+        pair.right_frame
+        for pair in pairs
+    ]
+
+    left_payload = (
+        build_calibcam_dict_from_selected_frames(
+            left_by_frame,
+            left_frames,
+            detection_ids,
+        )
+    )
+
+    right_payload = (
+        build_calibcam_dict_from_selected_frames(
+            right_by_frame,
+            right_frames,
+            detection_ids,
+        )
+    )
+
+    save_calibcam_detection(
+        left_path,
+        left_payload,
+    )
+
+    save_calibcam_detection(
+        right_path,
+        right_payload,
+    )
+
+    save_sync_reports(
+        run_dir=output_root,
+        window_results=window_results,
+        segments=segments,
+        synchronized_pairs=pairs,
+    )
+
+    return (
+        (left_path, right_path),
+        pairs,
+        segments,
+        window_results,
+    )

@@ -1,10 +1,12 @@
 # NanoDeepChArUco
 
-NanoDeepChArUco is a stereo ChArUco detection front end that produces
-CalibCam-compatible detections from two camera videos.
+NanoDeepChArUco is a stereo ChArUco detection and calibration front end that
+produces CalibCam-compatible detections from two camera videos.
 
-The pipeline uses explicit frame sampling and offsets, so the temporal
-alignment is controlled directly by the user.
+The pipeline supports both explicit frame offsets and automatic stereo
+synchronization. For the automated two-stage workflow it can also perform
+adaptive stable-board selection, fixed-intrinsic stereo calibration, and
+post-calibration residual-based outlier rejection.
 
 Three detector modes are available:
 
@@ -20,7 +22,11 @@ The generated detection payloads can be passed directly to CalibCam.
 left/right videos
         │
         ▼
-frame sampling + explicit offsets
+frame sampling
+        │
+        ├── explicit offsets
+        │
+        └── automatic stereo synchronization
         │
         ▼
 OpenCV / ArUco Nano / Hybrid detector
@@ -29,10 +35,19 @@ OpenCV / ArUco Nano / Hybrid detector
 ChArUco corners
         │
         ▼
+optional adaptive stable-board selection
+        │
+        ▼
 CalibCam-compatible detection payloads
         │
         ▼
 optional CalibCam calibration
+        │
+        ▼
+optional residual-based outlier rejection
+        │
+        ▼
+cleaned stereo calibration
 ```
 
 ## Installation
@@ -71,12 +86,42 @@ Two board definitions are included:
 ```text
 configs/boards/
 ├── large_7x7_dict4x4_50.npy
-└── small_5x6_dict6x6_250_meters.npy
+├── small_5x6_dict6x6_250_meters.npy
+└── small_5x6_dict6x6_250_meters_numpy1_compatible.npy
 ```
 
 The small board uses `DICT_6X6_250`.
 
+`small_5x6_dict6x6_250_meters_numpy1_compatible.npy` describes the
+same physical small board, but is serialized for the pinned
+CalibCam 4.2 / NumPy 1.x environment.
+
 The large board uses `DICT_4X4_50`.
+
+## Quick start: automated Stage-2 calibration
+
+For the automated two-stage workflow, use the included pipeline profile:
+
+```bash
+python -m nanodeepcharuco \
+  --config configs/pipelines/two_stage.yaml \
+  --videos LEFT_VIDEO.mp4 RIGHT_VIDEO.mp4 \
+  --stage1_intrinsics LEFT_INTRINSICS.yml RIGHT_INTRINSICS.yml \
+  --frames_end FRAME_COUNT \
+  --device cuda \
+  --calibcam_python /path/to/calibcam/python \
+  --data_path runs/my_calibration
+```
+
+The automated two-stage profile already selects the included
+NumPy-1-compatible CalibCam board. Use `--calibcam_board` only
+when intentionally overriding that default.
+
+Use `mps` instead of `cuda` on Apple Silicon, or `cpu` when no supported GPU is available.
+
+The profile automatically enables hybrid detection, automatic stereo synchronization, adaptive stable-board selection, fixed Stage-1 intrinsics, extrinsics-only CalibCam optimization, residual-based stereo-pair outlier rejection, and cleaned recalibration.
+
+Command-line arguments override values stored in the YAML profile.
 
 ## Nano example
 

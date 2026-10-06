@@ -81,3 +81,70 @@ def build_and_save_payload(
 
     save_calibcam_detection(output_path, payload)
     return payload
+
+
+def run_detector_on_frames(
+    video_path: str | Path,
+    detector,
+    physical_frames,
+    side_name: str,
+):
+    """
+    Run a detector on explicitly requested physical video frames.
+    """
+    video_path = Path(video_path).expanduser().resolve()
+
+    cap = cv2.VideoCapture(str(video_path))
+
+    if not cap.isOpened():
+        raise RuntimeError(
+            f"Could not open video: {video_path}"
+        )
+
+    try:
+        frame_count = int(
+            cap.get(cv2.CAP_PROP_FRAME_COUNT)
+        )
+
+        side_data = {}
+
+        for physical_frame_id in sorted({
+            int(frame)
+            for frame in physical_frames
+        }):
+            if (
+                physical_frame_id < 0
+                or physical_frame_id >= frame_count
+            ):
+                continue
+
+            cap.set(
+                cv2.CAP_PROP_POS_FRAMES,
+                physical_frame_id,
+            )
+
+            ok, frame = cap.read()
+
+            if not ok:
+                continue
+
+            if hasattr(detector, "process_frame"):
+                corners = detector.process_frame(
+                    frame,
+                    f"{side_name}_{physical_frame_id:08d}",
+                ).corners
+            else:
+                corners = detector.detect_dict(frame)
+
+            side_data[physical_frame_id] = corners
+
+            print(
+                f"{side_name} frame "
+                f"{physical_frame_id}: "
+                f"{len(corners)} corners"
+            )
+
+        return side_data
+
+    finally:
+        cap.release()

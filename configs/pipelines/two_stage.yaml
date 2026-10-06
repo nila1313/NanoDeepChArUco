@@ -1,0 +1,70 @@
+# NanoDeepChArUco automated two-stage Stage-2 profile.
+#
+# Dataset-specific values such as videos, Stage-1 intrinsic files,
+# frames_end, device, CalibCam interpreter, and output directory
+# should normally be supplied on the command line.
+
+board: configs/boards/small_5x6_dict6x6_250_meters.npy
+
+# Same physical board, serialized with NumPy 1.x for CalibCam 4.2.
+calibcam_board: configs/boards/small_5x6_dict6x6_250_meters_numpy1_compatible.npy
+
+detector: hybrid
+
+deep_checkpoint: models/deepcharuco/small_5x6/detector.ckpt
+refinenet_checkpoint: models/refinenet/refinenet.ckpt
+deep_config: configs/deepcharuco/small_5x6.yaml
+
+frames_start: 0
+frames_step: 20
+
+auto_sync: true
+
+sync_offsets:
+  - -10
+  - -9
+  - -8
+  - -7
+  - -6
+  - -5
+  - -4
+  - -3
+  - -2
+  - -1
+  - 0
+  - 1
+  - 2
+  - 3
+  - 4
+  - 5
+  - 6
+  - 7
+  - 8
+  - 9
+  - 10
+
+sync_frame_step: 20
+sync_window_size: 400
+sync_window_step: 200
+sync_min_inlier_ratio: 0.20
+sync_min_ratio_gap: 0.05
+sync_min_persistence: 2
+sync_max_gap_frames: 400
+
+stable_motion_mode: adaptive
+stable_motion_px: 2.0
+stable_motion_percentile: 25.0
+stable_motion_max_px: 6.0
+stable_min_frames: 3
+stable_min_pairs: 8
+
+models:
+  - omnidir
+  - omnidir
+
+projection: fisheye_equidistant
+
+calibcam_reject_outliers: true
+calibcam_outlier_mad_multiplier: 6.0
+calibcam_outlier_min_px: 6.0
+calibcam_outlier_max_px: 10.0
