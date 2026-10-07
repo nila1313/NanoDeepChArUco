@@ -25,7 +25,7 @@ Stage 1:
     Large 7x7 ChArUco board
               |
               v
-       Hybrid detection
+       NanoDeepCharuco detection
               |
         +-----+-----+
         |           |
@@ -51,7 +51,7 @@ Stage 2:
     Small 5x6 metric ChArUco board
               |
               v
-       Hybrid detection
+       NanoDeepCharuco detection
               |
               v
     Left(t) <-> Right(t+1)
@@ -104,7 +104,7 @@ Properties:
 
 ### Detector
 
-Stage 1 used the Hybrid detector:
+Stage 1 used the NanoDeepCharuco detector:
 
     ArUco Nano
         +
@@ -365,7 +365,7 @@ Optimization:
 
 ## 10. Reference Control
 
-Using the same new Stage-2 Hybrid detections with the previously validated
+Using the same new Stage-2 NanoDeepCharuco detections with the previously validated
 Stage-1 intrinsic files produced:
 
     baseline = 29.5107879 mm
@@ -373,7 +373,7 @@ Stage-1 intrinsic files produced:
     median residuals = approximately 0.33 px / 0.42 px
 
 This isolated the earlier problem to the incomplete Stage-1 procedure rather
-than Stage-2 synchronization, Hybrid small-board detection, fixed-intrinsics
+than Stage-2 synchronization, NanoDeepCharuco small-board detection, fixed-intrinsics
 handling, or CalibCam 4.2 integration.
 
 ## 11. Conclusion

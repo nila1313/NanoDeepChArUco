@@ -9,14 +9,15 @@ description = "CalibCam-compatible stereo ChArUco detection pipeline using OpenC
 readme = "README.md"
 requires-python = ">=3.10,<3.11"
 dependencies = [
-    "numpy==1.23.5",
-    "opencv-contrib-python-headless==4.11.0.86",
+    "numpy>=1.24",
+    "opencv-contrib-python-headless>=4.10,<4.12",
 ]
 
 [project.optional-dependencies]
-hybrid = [
+nanodeepcharuco = [
     "PyYAML==6.0.3",
-    "numba==0.56.4",
+    "setuptools>=68,<81",
+    "numba>=0.59,<0.60",
     "torch==2.0.1",
     "pytorch-lightning==1.9.3",
     "torchmetrics==0.11.1",

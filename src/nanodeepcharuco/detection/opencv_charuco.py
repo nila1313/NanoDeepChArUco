@@ -6,7 +6,7 @@ from pathlib import Path
 import cv2
 import numpy as np
 
-from .charuco import build_charuco_board, load_board_parameters
+from .charuco import build_charuco_board_from_params, load_board_parameters
 
 
 MIN_CORNERS = 5
@@ -77,8 +77,8 @@ class OpenCVCharucoDetector:
             )
         )
 
-        self.board = build_charuco_board(
-            self.board_path
+        self.board = build_charuco_board_from_params(
+            self.params
         )
 
         # Match CalibCam initial detection:

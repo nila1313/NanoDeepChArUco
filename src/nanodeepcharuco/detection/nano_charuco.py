@@ -9,7 +9,7 @@ import numpy as np
 
 from .aruco_nano import ArucoNanoDetector
 from .charuco import (
-    build_charuco_board,
+    build_charuco_board_from_params,
     interpolate_charuco_from_nano,
     load_board_parameters,
 )
@@ -79,8 +79,8 @@ class NanoCharucoDetector:
             f"{self.dictionary_type}"
         )
 
-        self.board = build_charuco_board(
-            self.board_path
+        self.board = build_charuco_board_from_params(
+            self.board_params
         )
 
         self.nano = ArucoNanoDetector(

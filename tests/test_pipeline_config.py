@@ -35,7 +35,7 @@ def test_pipeline_config_supplies_defaults(
         yaml.safe_dump(
             {
                 "board": str(board),
-                "detector": "hybrid",
+                "detector": "nanodeepcharuco",
                 "auto_sync": True,
                 "stable_motion_mode": (
                     "adaptive"
@@ -58,7 +58,7 @@ def test_pipeline_config_supplies_defaults(
     )
 
     assert args.board == board.resolve()
-    assert args.detector == "hybrid"
+    assert args.detector == "nanodeepcharuco"
     assert args.auto_sync is True
     assert (
         args.stable_motion_mode
@@ -159,3 +159,31 @@ def test_pipeline_config_supplies_calibcam_board(
         args.calibcam_board
         == calibcam_board.resolve()
     )
+
+
+def test_legacy_hybrid_detector_alias_is_normalized(tmp_path):
+    left = touch(
+        tmp_path / "left.MP4"
+    )
+    right = touch(
+        tmp_path / "right.MP4"
+    )
+    board = touch(
+        tmp_path / "board.npy"
+    )
+
+    args = parse_args(
+        [
+            "--videos",
+            str(left),
+            str(right),
+            "--board",
+            str(board),
+            "--detector",
+            "hybrid",
+            "--data_path",
+            str(tmp_path / "run"),
+        ]
+    )
+
+    assert args.detector == "nanodeepcharuco"
