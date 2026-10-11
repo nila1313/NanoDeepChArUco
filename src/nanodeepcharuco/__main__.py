@@ -82,7 +82,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         prog="nanodeepcharuco",
         description=(
             "Generate CalibCam-compatible stereo ChArUco detections with "
-            "OpenCV, ArUco Nano, or the NanoDeepCharuco hybrid detector."
+            "OpenCV, ArUco Nano, or the NanoDeepCharuco detector."
         ),
     )
     parser.add_argument(
@@ -107,8 +107,11 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         required=("board" not in config_defaults),
         type=existing_file,
     )
-    parser.add_argument("--detector", choices=("opencv", "nano", "hybrid"),
-                        default="nano")
+    parser.add_argument(
+        "--detector",
+        choices=("opencv", "nano", "nanodeepcharuco", "hybrid"),
+        default="nano",
+    )
     parser.add_argument("--frames_start", type=int, default=0)
     parser.add_argument("--frames_end", type=int, default=None)
     parser.add_argument("--frames_step", type=positive_int, default=20)
@@ -435,6 +438,9 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     if args.auto_sync and not args.sync_offsets:
         parser.error("--sync_offsets must contain at least one candidate offset")
 
+    if args.detector == "hybrid":
+        args.detector = "nanodeepcharuco"
+
     return args
 
 
@@ -459,12 +465,12 @@ def make_detector(args: argparse.Namespace, side: str, output_root: Path):
         )
 
     if args.deep_checkpoint is None:
-        raise ValueError("--deep_checkpoint is required for the hybrid detector")
+        raise ValueError("--deep_checkpoint is required for the NanoDeepCharuco detector")
 
     if args.deep_config is None:
-        raise ValueError("--deep_config is required for the hybrid detector")
+        raise ValueError("--deep_config is required for the NanoDeepCharuco detector")
     from nanodeepcharuco.detection.deep_charuco import DeepCharucoDetector
-    from nanodeepcharuco.detection.hybrid import NanoDeepCharucoDetector
+    from nanodeepcharuco.detection.nanodeepcharuco import NanoDeepCharucoDetector
     deep = DeepCharucoDetector(
         project_root=PROJECT_ROOT,
         deep_checkpoint=resolved(args.deep_checkpoint),

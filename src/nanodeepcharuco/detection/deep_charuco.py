@@ -161,7 +161,7 @@ class DeepCharucoDetector:
         frame: np.ndarray,
     ):
         """
-        Match the previous experimental deep_predictions() behavior.
+        Return DeepChArUco detections with audit information.
 
         Returns:
             clean detections,

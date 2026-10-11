@@ -46,9 +46,7 @@ def load_board_parameters(board_path: str | Path) -> dict:
     return params
 
 
-def build_charuco_board(board_path: str | Path):
-    params = load_board_parameters(board_path)
-
+def build_charuco_board_from_params(params: dict):
     dictionary = cv2.aruco.getPredefinedDictionary(
         int(params["dictionary_type"])
     )
@@ -64,6 +62,11 @@ def build_charuco_board(board_path: str | Path):
     )
 
     return board
+
+
+def build_charuco_board(board_path: str | Path):
+    params = load_board_parameters(board_path)
+    return build_charuco_board_from_params(params)
 
 
 def interpolate_charuco_from_nano(
