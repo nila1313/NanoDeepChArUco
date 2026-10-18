@@ -279,8 +279,72 @@ runs/example_calibration/calibcam_output/
 
 ## Wide-angle two-stage calibration
 
-The explicit-offset wide-angle workflow separates intrinsic calibration from
-stereo extrinsic calibration.
+The wide-angle workflow separates intrinsic calibration from stereo extrinsic
+calibration.
+
+### CalibCam-backed NanoDeepCharuco workflow
+
+`nanodeepcharuco.calibcam.two_stage_backend` runs the two calibration stages
+through CalibCam's optional NanoDeepCharuco detection backend. CalibCam performs
+the detection itself and writes its normal `detection_*.yml` and calibration
+outputs.
+
+Synchronization is intentionally kept outside this runner. Stage 2 therefore
+requires explicit frame offsets supplied with `--frames-offsets`.
+
+Stage 1 uses the large ChArUco board and calibrates the two cameras
+independently:
+
+    python -m nanodeepcharuco.calibcam.two_stage_backend stage1 \
+      --videos /path/to/large_left.MP4 /path/to/large_right.MP4 \
+      --board configs/boards/large_7x7_dict4x4_50.npy \
+      --nano-executable third_party/aruco_nano/build/detect_batch \
+      --deep-checkpoint models/deepcharuco/large_7x7/detector.ckpt \
+      --refinenet-checkpoint models/refinenet/refinenet.ckpt \
+      --config-path configs/deepcharuco/pair2_epoch146.yaml \
+      --frames-start 0 \
+      --frames-step 20 \
+      --model omnidir \
+      --projection fisheye_equidistant \
+      --calibcam-python /path/to/calibcam/python \
+      --data-path runs/two_stage_backend/stage1
+
+The Stage-1 intrinsic files are written to:
+
+    runs/two_stage_backend/stage1/left/multicam_calibration.yml
+    runs/two_stage_backend/stage1/right/multicam_calibration.yml
+
+Stage 2 uses the small ChArUco board, loads those intrinsic files, keeps
+`A`, `k`, and `xi` fixed, and optimizes stereo extrinsics and board poses:
+
+    python -m nanodeepcharuco.calibcam.two_stage_backend stage2 \
+      --videos /path/to/small_left.MP4 /path/to/small_right.MP4 \
+      --board configs/boards/small_5x6_dict6x6_250_meters.npy \
+      --stage1-intrinsics \
+        runs/two_stage_backend/stage1/left/multicam_calibration.yml \
+        runs/two_stage_backend/stage1/right/multicam_calibration.yml \
+      --nano-executable third_party/aruco_nano/build/detect_batch \
+      --deep-checkpoint models/deepcharuco/small_5x6/detector.ckpt \
+      --refinenet-checkpoint models/refinenet/refinenet.ckpt \
+      --config-path configs/deepcharuco/small_5x6.yaml \
+      --frames-start 0 \
+      --frames-end 2640 \
+      --frames-step 20 \
+      --frames-offsets 0 1 \
+      --models omnidir omnidir \
+      --projection fisheye_equidistant \
+      --calibcam-python /path/to/calibcam/python \
+      --data-path runs/two_stage_backend/stage2
+
+For example, `--frames-offsets 0 1` means:
+
+    Left(t) <-> Right(t+1)
+
+### Existing external-detection workflow
+
+The previously validated explicit-offset workflow remains available. It creates
+NanoDeepCharuco detection payloads first and then passes those detections to
+CalibCam.
 
 ### Stage 1: independent camera intrinsics
 
