@@ -343,6 +343,104 @@ def run_stage2(args: argparse.Namespace) -> Path:
     return calibration_path
 
 
+def add_common_arguments(
+    parser: argparse.ArgumentParser,
+) -> None:
+    parser.add_argument(
+        "--videos",
+        nargs=2,
+        required=True,
+        type=existing_file,
+        metavar=("LEFT", "RIGHT"),
+    )
+
+    parser.add_argument(
+        "--board",
+        required=True,
+        type=existing_file,
+    )
+
+    parser.add_argument(
+        "--project-root",
+        type=Path,
+        default=PROJECT_ROOT,
+    )
+
+    parser.add_argument(
+        "--nano-executable",
+        required=True,
+        type=existing_file,
+    )
+
+    parser.add_argument(
+        "--deep-checkpoint",
+        required=True,
+        type=existing_file,
+    )
+
+    parser.add_argument(
+        "--refinenet-checkpoint",
+        required=True,
+        type=existing_file,
+    )
+
+    parser.add_argument(
+        "--config-path",
+        required=True,
+        type=existing_file,
+    )
+
+    parser.add_argument(
+        "--device",
+        choices=(
+            "cpu",
+            "cuda",
+            "mps",
+        ),
+        default=None,
+    )
+
+    parser.add_argument(
+        "--frames-start",
+        type=int,
+        default=0,
+    )
+
+    parser.add_argument(
+        "--frames-end",
+        type=int,
+        default=None,
+    )
+
+    parser.add_argument(
+        "--frames-step",
+        type=int,
+        default=20,
+    )
+
+    parser.add_argument(
+        "--projection",
+        default="fisheye_equidistant",
+    )
+
+    parser.add_argument(
+        "--calibcam-python",
+        type=existing_file,
+        default=Path(sys.executable),
+    )
+
+    parser.add_argument(
+        "--data-path",
+        required=True,
+        type=Path,
+    )
+
+    parser.add_argument(
+        "--keep-work",
+        action="store_true",
+    )
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog=(
@@ -369,103 +467,11 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
 
-    stage1.add_argument(
-        "--videos",
-        nargs=2,
-        required=True,
-        type=existing_file,
-        metavar=("LEFT", "RIGHT"),
-    )
-
-    stage1.add_argument(
-        "--board",
-        required=True,
-        type=existing_file,
-    )
-
-    stage1.add_argument(
-        "--project-root",
-        type=Path,
-        default=PROJECT_ROOT,
-    )
-
-    stage1.add_argument(
-        "--nano-executable",
-        required=True,
-        type=existing_file,
-    )
-
-    stage1.add_argument(
-        "--deep-checkpoint",
-        required=True,
-        type=existing_file,
-    )
-
-    stage1.add_argument(
-        "--refinenet-checkpoint",
-        required=True,
-        type=existing_file,
-    )
-
-    stage1.add_argument(
-        "--config-path",
-        required=True,
-        type=existing_file,
-    )
-
-    stage1.add_argument(
-        "--device",
-        choices=(
-            "cpu",
-            "cuda",
-            "mps",
-        ),
-        default=None,
-    )
-
-    stage1.add_argument(
-        "--frames-start",
-        type=int,
-        default=0,
-    )
-
-    stage1.add_argument(
-        "--frames-end",
-        type=int,
-        default=None,
-    )
-
-    stage1.add_argument(
-        "--frames-step",
-        type=int,
-        default=20,
-    )
+    add_common_arguments(stage1)
 
     stage1.add_argument(
         "--model",
         default="omnidir",
-    )
-
-    stage1.add_argument(
-        "--projection",
-        default="fisheye_equidistant",
-    )
-
-    stage1.add_argument(
-        "--calibcam-python",
-        type=existing_file,
-        default=Path(sys.executable),
-    )
-
-    stage1.add_argument(
-        "--data-path",
-        required=True,
-        type=Path,
-    )
-
-    stage1.add_argument(
-        "--keep-work",
-        action="store_true",
     )
 
     stage2 = subparsers.add_parser(
@@ -476,84 +482,17 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
 
-    stage2.add_argument(
-        "--videos",
-        nargs=2,
-        required=True,
-        type=existing_file,
-        metavar=("LEFT", "RIGHT"),
-    )
-
-    stage2.add_argument(
-        "--board",
-        required=True,
-        type=existing_file,
-    )
+    add_common_arguments(stage2)
 
     stage2.add_argument(
         "--stage1-intrinsics",
         nargs=2,
         required=True,
         type=existing_file,
-        metavar=("LEFT_CALIBRATION", "RIGHT_CALIBRATION"),
-    )
-
-    stage2.add_argument(
-        "--project-root",
-        type=Path,
-        default=PROJECT_ROOT,
-    )
-
-    stage2.add_argument(
-        "--nano-executable",
-        required=True,
-        type=existing_file,
-    )
-
-    stage2.add_argument(
-        "--deep-checkpoint",
-        required=True,
-        type=existing_file,
-    )
-
-    stage2.add_argument(
-        "--refinenet-checkpoint",
-        required=True,
-        type=existing_file,
-    )
-
-    stage2.add_argument(
-        "--config-path",
-        required=True,
-        type=existing_file,
-    )
-
-    stage2.add_argument(
-        "--device",
-        choices=(
-            "cpu",
-            "cuda",
-            "mps",
+        metavar=(
+            "LEFT_CALIBRATION",
+            "RIGHT_CALIBRATION",
         ),
-        default=None,
-    )
-
-    stage2.add_argument(
-        "--frames-start",
-        type=int,
-        default=0,
-    )
-
-    stage2.add_argument(
-        "--frames-end",
-        type=int,
-        default=None,
-    )
-
-    stage2.add_argument(
-        "--frames-step",
-        type=int,
-        default=20,
     )
 
     stage2.add_argument(
@@ -576,30 +515,7 @@ def build_parser() -> argparse.ArgumentParser:
         metavar=("LEFT", "RIGHT"),
     )
 
-    stage2.add_argument(
-        "--projection",
-        default="fisheye_equidistant",
-    )
-
-    stage2.add_argument(
-        "--calibcam-python",
-        type=existing_file,
-        default=Path(sys.executable),
-    )
-
-    stage2.add_argument(
-        "--data-path",
-        required=True,
-        type=Path,
-    )
-
-    stage2.add_argument(
-        "--keep-work",
-        action="store_true",
-    )
-
     return parser
-
 
 def main(
     argv: list[str] | None = None,
