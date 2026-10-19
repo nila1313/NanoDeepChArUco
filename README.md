@@ -14,13 +14,47 @@ Three detector modes are available:
 - `nano` — ArUco Nano marker detection followed by ChArUco interpolation
 - `nanodeepcharuco` — ArUco Nano with gamma retry and DeepChArUco recovery
 
+## Detection strategy
+
+The `NanoDeepCharuco` mode uses a staged detection strategy. It starts with
+ArUco Nano and only uses the deep detector when Nano detection is
+insufficient.
+
+```text
+input frame
+    │
+    ▼
+ArUco Nano detection
+    │
+    ├── sufficient corners → use Nano result
+    │
+    ▼
+gamma-corrected Nano retry
+    │
+    ├── sufficient corners → use recovered Nano result
+    │
+    ▼
+DeepChArUco recovery
+    │
+    ▼
+geometric validation
+    │
+    ▼
+accepted ChArUco corners
+```
+
+ArUco Nano is used first for efficient marker detection. If the initial
+detection is insufficient, the frame is retried with gamma correction.
+DeepChArUco is used only as a recovery step for more difficult frames, and
+recovered corners are geometrically validated before they are accepted.
+
 The generated detection payloads can be passed directly to CalibCam.
 
 ## General detection-first pipeline
 
 This diagram shows the general detection-first workflow. It can stop after
-creating CalibCam-compatible detection payloads, so calibration and later
-filtering steps are optional here.
+creating CalibCam-compatible detection payloads. If calibration is needed,
+those payloads can be passed to CalibCam.
 
 The dedicated wide-angle two-stage workflow described below uses CalibCam for
 both calibration stages and keeps synchronization outside the calibration runner.
@@ -42,19 +76,19 @@ OpenCV / ArUco Nano / NanoDeepCharuco detector
 ChArUco corners
         │
         ▼
-optional adaptive stable-board selection
+adaptive stable-board selection (when enabled)
         │
         ▼
 CalibCam-compatible detection payloads
         │
         ▼
-optional CalibCam calibration
+CalibCam calibration (when continuing past detection)
         │
         ▼
-optional residual-based outlier rejection
+residual-based outlier rejection (when enabled)
         │
         ▼
-cleaned stereo calibration
+stereo calibration output
 ```
 
 ## Installation
