@@ -16,7 +16,14 @@ Three detector modes are available:
 
 The generated detection payloads can be passed directly to CalibCam.
 
-## Pipeline
+## General detection-first pipeline
+
+This diagram shows the general detection-first workflow. It can stop after
+creating CalibCam-compatible detection payloads, so calibration and later
+filtering steps are optional here.
+
+The dedicated wide-angle two-stage workflow described below uses CalibCam for
+both calibration stages and keeps synchronization outside the calibration runner.
 
 ```text
 left/right videos
@@ -81,7 +88,13 @@ conda activate nanodeepcharuco
 
 ## Board files
 
-Two board definitions are included:
+The repository uses two physical ChArUco boards:
+
+- a large 7x7 board using `DICT_4X4_50`
+- a small 5x6 board using `DICT_6X6_250`
+
+Three `.npy` files are included because the small board is stored in two
+serialization formats:
 
 ```text
 configs/boards/
@@ -90,17 +103,21 @@ configs/boards/
 └── small_5x6_dict6x6_250_meters_numpy1_compatible.npy
 ```
 
-The small board uses `DICT_6X6_250`.
+The two small-board files describe the same physical calibration target.
 
-`small_5x6_dict6x6_250_meters_numpy1_compatible.npy` describes the
-same physical small board, but is serialized for the pinned
-CalibCam 4.2 / NumPy 1.x environment.
+`small_5x6_dict6x6_250_meters.npy` is the standard board file.
 
-The large board uses `DICT_4X4_50`.
+`small_5x6_dict6x6_250_meters_numpy1_compatible.npy` contains the same board
+parameters but is serialized for NumPy 1.x compatibility, including the
+CalibCam 4.2 environment used during validation.
 
-## Quick start: automated Stage-2 calibration
+## Existing automated Stage-2 workflow
 
-For the automated two-stage workflow, use the included pipeline profile:
+The repository also contains an automated workflow with automatic synchronization, stable-board selection, fixed Stage-1 intrinsics, and residual-based cleanup.
+
+This is separate from the focused CalibCam-backed two-stage workflow described later, where synchronization is provided explicitly.
+
+To use the automated profile:
 
 ```bash
 python -m nanodeepcharuco \
@@ -279,18 +296,18 @@ runs/example_calibration/calibcam_output/
 
 ## Wide-angle two-stage calibration
 
-The wide-angle workflow separates intrinsic calibration from stereo extrinsic
+This workflow keeps intrinsic calibration separate from stereo extrinsic
 calibration.
 
 ### CalibCam-backed NanoDeepCharuco workflow
 
-`nanodeepcharuco.calibcam.two_stage_backend` runs the two calibration stages
-through CalibCam's optional NanoDeepCharuco detection backend. CalibCam performs
-the detection itself and writes its normal `detection_*.yml` and calibration
-outputs.
+`nanodeepcharuco.calibcam.two_stage_backend` runs both calibration stages
+through the NanoDeepCharuco detection backend in CalibCam. CalibCam handles
+detection and calibration and writes its normal `detection_*.yml` and
+calibration outputs.
 
-Synchronization is intentionally kept outside this runner. Stage 2 therefore
-requires explicit frame offsets supplied with `--frames-offsets`.
+Synchronization is handled outside the calibration runner. Stage 2 therefore
+requires explicit left and right frame offsets supplied with `--frames-offsets`.
 
 Stage 1 uses the large ChArUco board and calibrates the two cameras
 independently:
