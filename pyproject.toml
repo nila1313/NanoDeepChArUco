@@ -31,6 +31,9 @@ test = [
 [project.scripts]
 nanodeepcharuco = "nanodeepcharuco.__main__:main"
 
+[project.entry-points."calibcam.detection_backends"]
+nanodeepcharuco = "nanodeepcharuco.calibcam_backend:NanoDeepCharucoBackend"
+
 [tool.setuptools.packages.find]
 where = ["src"]
 
