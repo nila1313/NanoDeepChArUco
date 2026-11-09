@@ -143,6 +143,21 @@ def detect_frame(frame, frame_idx, context):
 class NanoDeepCharucoBackend(DetectionBackend):
     """CalibCam adapter for NanoDeepCharuco detection."""
 
+    # NanoDeepCharuco does its own preprocessing (e.g. gamma recovery) and was
+    # validated on raw frames, so calibcam's common preprocessing is skipped.
+    uses_preprocessing = False
+
+    default_opts = {
+        "project_root": False,
+        "nano_executable": False,
+        "deep_checkpoint": False,
+        "refinenet_checkpoint": False,
+        "config_path": False,
+        "device": False,
+        "work_dir": False,
+        "keep_work": False,
+    }
+
     def create_context(
         self,
         video: str | Path,
