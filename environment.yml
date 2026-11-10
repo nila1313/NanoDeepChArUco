@@ -9,4 +9,4 @@ dependencies:
   - pip
 
   - pip:
-      - -e .[hybrid,test]
+      - -e .[nanodeepcharuco,test]

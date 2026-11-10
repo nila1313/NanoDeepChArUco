@@ -109,7 +109,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     )
     parser.add_argument(
         "--detector",
-        choices=("opencv", "nano", "nanodeepcharuco", "hybrid"),
+        choices=("opencv", "nano", "nanodeepcharuco"),
         default="nano",
     )
     parser.add_argument("--frames_start", type=int, default=0)
@@ -437,9 +437,6 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 
     if args.auto_sync and not args.sync_offsets:
         parser.error("--sync_offsets must contain at least one candidate offset")
-
-    if args.detector == "hybrid":
-        args.detector = "nanodeepcharuco"
 
     return args
 

@@ -161,7 +161,7 @@ def test_pipeline_config_supplies_calibcam_board(
     )
 
 
-def test_legacy_hybrid_detector_alias_is_normalized(tmp_path):
+def test_explicit_nanodeepcharuco_detector_option(tmp_path):
     left = touch(
         tmp_path / "left.MP4"
     )
@@ -180,7 +180,7 @@ def test_legacy_hybrid_detector_alias_is_normalized(tmp_path):
             "--board",
             str(board),
             "--detector",
-            "hybrid",
+            "nanodeepcharuco",
             "--data_path",
             str(tmp_path / "run"),
         ]
