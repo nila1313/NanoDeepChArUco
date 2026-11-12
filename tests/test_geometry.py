@@ -20,13 +20,13 @@ def test_homography_from_large_board_geometry():
     assert estimate_homography(points, grid_width=6) is not None
 
 
-def test_hybrid_nano_is_good_uses_runtime_grid_width(monkeypatch):
+def test_nanodeepcharuco_nano_is_good_uses_runtime_grid_width(monkeypatch):
     import numpy as np
-    import nanodeepcharuco.detection.hybrid as hybrid_module
-    from nanodeepcharuco.detection.hybrid import NanoDeepCharucoDetector
+    import nanodeepcharuco.detection.nanodeepcharuco as nanodeepcharuco_module
+    from nanodeepcharuco.detection.nanodeepcharuco import NanoDeepCharucoDetector
 
     monkeypatch.setattr(
-        hybrid_module,
+        nanodeepcharuco_module,
         "NANO_GOOD_MIN_CORNERS",
         4,
     )

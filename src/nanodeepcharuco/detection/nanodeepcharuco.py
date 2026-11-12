@@ -1,19 +1,22 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 import shutil
+from typing import TYPE_CHECKING
 
 import cv2
 import numpy as np
 
 from .aruco_nano import ArucoNanoDetector
 from .charuco import (
-    build_charuco_board,
+    build_charuco_board_from_params,
     interpolate_charuco_from_nano,
     load_board_parameters,
 )
-from .deep_charuco import DeepCharucoDetector
+if TYPE_CHECKING:
+    from .deep_charuco import DeepCharucoDetector
+
 from .geometry import (
     MIN_HOMOGRAPHY_ANCHORS,
     deep_self_verify,
@@ -27,7 +30,7 @@ NANO_GOOD_MIN_CORNERS = 15
 
 
 @dataclass
-class HybridDetectionResult:
+class NanoDeepCharucoDetectionResult:
     corners: dict[int, np.ndarray]
     status: str
 
@@ -37,30 +40,44 @@ class HybridDetectionResult:
     nano_source: str
     nano_base: int
 
-    deep_ran: bool
-    deep_raw: int
-    deep_clean: int
+    deep_ran: bool = False
+    deep_raw: int = 0
+    deep_clean: int = 0
 
-    duplicate_deep_ids: list[int]
-    accepted_deep_ids: list[int]
+    duplicate_deep_ids: list[int] = field(default_factory=list)
+    accepted_deep_ids: list[int] = field(default_factory=list)
 
-    geometry_status: str
+    geometry_status: str = "NOT_NEEDED"
 
 
 class NanoDeepCharucoDetector:
     def __init__(
         self,
-        board_path: str | Path,
+        board_path: str | Path | None,
         nano_executable: str | Path,
         deep_detector: DeepCharucoDetector,
         work_dir: str | Path,
         keep_work: bool = False,
+        board_params: dict | None = None,
     ):
-        self.board_path = (
-            Path(board_path)
-            .expanduser()
-            .resolve()
-        )
+        if board_params is None:
+            if board_path is None:
+                raise ValueError(
+                    "Either board_path or board_params must be provided"
+                )
+
+            self.board_path = (
+                Path(board_path)
+                .expanduser()
+                .resolve()
+            )
+
+            self.board_params = load_board_parameters(
+                self.board_path
+            )
+        else:
+            self.board_path = None
+            self.board_params = dict(board_params)
 
         self.work_dir = (
             Path(work_dir)
@@ -75,22 +92,18 @@ class NanoDeepCharucoDetector:
 
         self.keep_work = bool(keep_work)
 
-        self.board_params = load_board_parameters(
-            self.board_path
-        )
-
         self.dictionary_type = int(
             self.board_params["dictionary_type"]
         )
         self.grid_width = int(self.board_params["boardWidth"]) - 1
 
         print(
-            f"Hybrid Nano dictionary_type: "
+            f"NanoDeepCharuco dictionary_type: "
             f"{self.dictionary_type}"
         )
 
-        self.board = build_charuco_board(
-            self.board_path
+        self.board = build_charuco_board_from_params(
+            self.board_params
         )
 
         self.nano = ArucoNanoDetector(
@@ -163,104 +176,80 @@ class NanoDeepCharucoDetector:
         input_dir = self.work_dir / tag
 
         if input_dir.exists():
-            shutil.rmtree(
-                input_dir
-            )
+            shutil.rmtree(input_dir)
 
         input_dir.mkdir(
             parents=True,
             exist_ok=True,
         )
 
-        image_path = (
-            input_dir
-            / "frame.jpg"
-        )
+        try:
+            image_path = input_dir / "frame.jpg"
+            json_path = input_dir / "nano.json"
 
-        json_path = (
-            input_dir
-            / "nano.json"
-        )
-
-        ok = cv2.imwrite(
-            str(image_path),
-            frame,
-        )
-
-        if not ok:
-            raise RuntimeError(
-                f"Could not write temporary frame: "
-                f"{image_path}"
+            ok = cv2.imwrite(
+                str(image_path),
+                frame,
             )
 
-        result = self.nano.detect_directory(
-            input_dir,
-            json_path,
-            dictionary_id=self.dictionary_type,
-        )
+            if not ok:
+                raise RuntimeError(
+                    f"Could not write temporary frame: {image_path}"
+                )
 
-        markers = result.get(
-            "frame.jpg",
-            [],
-        )
+            result = self.nano.detect_directory(
+                input_dir,
+                json_path,
+                dictionary_id=self.dictionary_type,
+            )
 
-        charuco = (
-            interpolate_charuco_from_nano(
+            markers = result.get(
+                "frame.jpg",
+                [],
+            )
+
+            charuco = interpolate_charuco_from_nano(
                 frame,
                 markers,
                 self.board,
             )
-        )
 
-        coords = {
-            int(c.corner_id):
-            np.asarray(
-                c.point,
-                dtype=np.float32,
-            )
-            for c in charuco
-        }
+            coords = {
+                int(c.corner_id): np.asarray(
+                    c.point,
+                    dtype=np.float32,
+                )
+                for c in charuco
+            }
 
-        if not self.keep_work:
-            shutil.rmtree(
-                input_dir,
-                ignore_errors=True,
-            )
+            return coords
 
-        return (
-            coords,
-            len(markers),
-        )
-
-    def deep_predictions(
-        self,
-        frame: np.ndarray,
-    ):
-        return self.deep.detect_with_audit(
-            frame
-        )
+        finally:
+            if not self.keep_work:
+                shutil.rmtree(
+                    input_dir,
+                    ignore_errors=True,
+                )
 
     def process_frame(
         self,
         frame: np.ndarray,
         tag: str,
-    ) -> HybridDetectionResult:
+    ) -> NanoDeepCharucoDetectionResult:
 
         # ============================================
         # Stage 1: RAW Nano
         # ============================================
 
-        raw_dict, _ = (
-            self.nano_predictions(
-                frame,
-                f"{tag}_raw",
-            )
+        raw_dict = self.nano_predictions(
+            frame,
+            f"{tag}_raw",
         )
 
         if self.nano_is_good(
             raw_dict
         ):
-            return HybridDetectionResult(
+            return NanoDeepCharucoDetectionResult(
                 corners=raw_dict,
                 status="RAW_NANO",
 
@@ -270,14 +259,6 @@ class NanoDeepCharucoDetector:
                 nano_source="RAW",
                 nano_base=len(raw_dict),
 
-                deep_ran=False,
-                deep_raw=0,
-                deep_clean=0,
-
-                duplicate_deep_ids=[],
-                accepted_deep_ids=[],
-
-                geometry_status="NOT_NEEDED",
             )
 
         # ============================================
@@ -290,17 +271,15 @@ class NanoDeepCharucoDetector:
             )
         )
 
-        gamma_dict, _ = (
-            self.nano_predictions(
-                gamma_frame,
-                f"{tag}_gamma",
-            )
+        gamma_dict = self.nano_predictions(
+            gamma_frame,
+            f"{tag}_gamma",
         )
 
         if self.nano_is_good(
             gamma_dict
         ):
-            return HybridDetectionResult(
+            return NanoDeepCharucoDetectionResult(
                 corners=gamma_dict,
                 status="GAMMA_NANO",
 
@@ -310,14 +289,6 @@ class NanoDeepCharucoDetector:
                 nano_source="GAMMA_DARK",
                 nano_base=len(gamma_dict),
 
-                deep_ran=False,
-                deep_raw=0,
-                deep_clean=0,
-
-                duplicate_deep_ids=[],
-                accepted_deep_ids=[],
-
-                geometry_status="NOT_NEEDED",
             )
 
         # ============================================
@@ -336,7 +307,7 @@ class NanoDeepCharucoDetector:
         # ============================================
 
         deep_dict, duplicates, deep_raw = (
-            self.deep_predictions(
+            self.deep.detect_with_audit(
                 frame
             )
         )
@@ -371,7 +342,7 @@ class NanoDeepCharucoDetector:
                 self.grid_width,
             )
 
-            return HybridDetectionResult(
+            return NanoDeepCharucoDetectionResult(
                 corners=recovered,
                 status="DEEP_NANO_H",
 
@@ -436,7 +407,7 @@ class NanoDeepCharucoDetector:
 
                 accepted.append(idx)
 
-        return HybridDetectionResult(
+        return NanoDeepCharucoDetectionResult(
             corners=recovered,
             status="DEEP_SELF",
 

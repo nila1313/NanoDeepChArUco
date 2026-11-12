@@ -12,7 +12,7 @@ Three detector modes are available:
 
 - `opencv` — OpenCV ArUco/ChArUco baseline
 - `nano` — ArUco Nano marker detection followed by ChArUco interpolation
-- `hybrid` — ArUco Nano with gamma retry and DeepChArUco recovery
+- `nanodeepcharuco` — ArUco Nano with gamma retry and DeepChArUco recovery
 
 The generated detection payloads can be passed directly to CalibCam.
 
@@ -29,7 +29,7 @@ frame sampling
         └── automatic stereo synchronization
         │
         ▼
-OpenCV / ArUco Nano / Hybrid detector
+OpenCV / ArUco Nano / NanoDeepCharuco detector
         │
         ▼
 ChArUco corners
@@ -79,6 +79,29 @@ Then activate the environment:
 conda activate nanodeepcharuco
 ```
 
+## Using NanoDeepCharuco as a CalibCam detection backend
+
+NanoDeepCharuco can also be used directly inside CalibCam as an optional
+detection backend. OpenCV remains CalibCam's default.
+
+Install this package into the same Python environment as CalibCam, from the
+repository root:
+
+```bash
+python -m pip install -e ".[nanodeepcharuco]"
+```
+
+The package registers itself as a CalibCam detection backend. Check that
+CalibCam finds it:
+
+```bash
+python -c 'from calibcam.detection_backends import available; print(available())'
+```
+
+The output should include `nanodeepcharuco`. Select the backend and set the
+paths to the Nano executable and the DeepChArUco checkpoints in a CalibCam
+options file (see the CalibCam README for an example).
+
 ## Board files
 
 Two board definitions are included:
@@ -119,7 +142,7 @@ when intentionally overriding that default.
 
 Use `mps` instead of `cuda` on Apple Silicon, or `cpu` when no supported GPU is available.
 
-The profile automatically enables hybrid detection, automatic stereo synchronization, adaptive stable-board selection, fixed Stage-1 intrinsics, extrinsics-only CalibCam optimization, residual-based stereo-pair outlier rejection, and cleaned recalibration.
+The profile automatically enables NanoDeepCharuco detection, automatic stereo synchronization, adaptive stable-board selection, fixed Stage-1 intrinsics, extrinsics-only CalibCam optimization, residual-based stereo-pair outlier rejection, and cleaned recalibration.
 
 Command-line arguments override values stored in the YAML profile.
 
@@ -189,9 +212,9 @@ right frame = 421
 detection index = 0 for both cameras
 ```
 
-## Hybrid example
+## NanoDeepCharuco example
 
-The hybrid detector combines ArUco Nano with DeepChArUco recovery.
+The NanoDeepCharuco detector combines ArUco Nano with DeepChArUco recovery.
 
 Example using the included large-board detector:
 
@@ -202,7 +225,7 @@ nanodeepcharuco \
   /path/to/right.MP4 \
   --board \
   configs/boards/large_7x7_dict4x4_50.npy \
-  --detector hybrid \
+  --detector nanodeepcharuco \
   --deep_checkpoint \
   models/deepcharuco/large_7x7/detector.ckpt \
   --refinenet_checkpoint \
@@ -211,7 +234,7 @@ nanodeepcharuco \
   configs/deepcharuco/pair2_epoch146.yaml \
   --frames_step 20 \
   --frames_offsets 0 1 \
-  --data_path runs/example_hybrid
+  --data_path runs/example_nanodeepcharuco
 ```
 
 The pinned DeepChArUco source is stored as a Git submodule under:
@@ -292,7 +315,7 @@ Example:
     nanodeepcharuco \
       --videos /path/to/large_left.MP4 /path/to/large_right.MP4 \
       --board configs/boards/large_7x7_dict4x4_50.npy \
-      --detector hybrid \
+      --detector nanodeepcharuco \
       --deep_checkpoint models/deepcharuco/large_7x7/detector.ckpt \
       --refinenet_checkpoint models/refinenet/refinenet.ckpt \
       --deep_config configs/deepcharuco/pair2_epoch146.yaml \
@@ -321,7 +344,7 @@ Example:
     nanodeepcharuco \
       --videos /path/to/small_left.MP4 /path/to/small_right.MP4 \
       --board configs/boards/small_5x6_dict6x6_250_meters.npy \
-      --detector hybrid \
+      --detector nanodeepcharuco \
       --deep_checkpoint models/deepcharuco/small_5x6/detector.ckpt \
       --refinenet_checkpoint models/refinenet/refinenet.ckpt \
       --deep_config configs/deepcharuco/small_5x6.yaml \
