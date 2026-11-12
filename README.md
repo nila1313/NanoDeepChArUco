@@ -79,6 +79,29 @@ Then activate the environment:
 conda activate nanodeepcharuco
 ```
 
+## Using NanoDeepCharuco as a CalibCam detection backend
+
+NanoDeepCharuco can also be used directly inside CalibCam as an optional
+detection backend. OpenCV remains CalibCam's default.
+
+Install this package into the same Python environment as CalibCam, from the
+repository root:
+
+```bash
+python -m pip install -e ".[nanodeepcharuco]"
+```
+
+The package registers itself as a CalibCam detection backend. Check that
+CalibCam finds it:
+
+```bash
+python -c 'from calibcam.detection_backends import available; print(available())'
+```
+
+The output should include `nanodeepcharuco`. Select the backend and set the
+paths to the Nano executable and the DeepChArUco checkpoints in a CalibCam
+options file (see the CalibCam README for an example).
+
 ## Board files
 
 Two board definitions are included:
