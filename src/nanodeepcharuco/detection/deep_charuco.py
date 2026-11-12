@@ -23,7 +23,12 @@ class DeepCharucoDetector:
         refinenet_checkpoint: str | Path,
         config_path: str | Path | None = None,
         device: str | None = None,
+        coordinate_mapping: str = "legacy",
     ):
+        if coordinate_mapping not in ("legacy", "centre_aligned", "calibrated"):
+            raise ValueError(f"Unknown coordinate mapping: {coordinate_mapping}")
+        self.coordinate_mapping = coordinate_mapping
+
         self.project_root = Path(project_root).expanduser().resolve()
 
         self.deep_src = (
@@ -97,6 +102,14 @@ class DeepCharucoDetector:
         self.config = self._load_configuration(
             str(self.config_path)
         )
+
+        if (
+            self.coordinate_mapping == "calibrated"
+            and tuple(self.config.input_size) != (320, 240)
+        ):
+            raise ValueError(
+                "Calibrated mapping requires Deep input size 320x240"
+            )
 
         self.deepc, self.refinenet = (
             self._load_models(
@@ -173,6 +186,17 @@ class DeepCharucoDetector:
             self._infer_keypoints(frame)
         )
 
+        if self.coordinate_mapping == "legacy":
+            offset_x = offset_y = 0.0
+        elif self.coordinate_mapping == "centre_aligned":
+            offset_x = (scale_x - 1.0) / 2.0
+            offset_y = (scale_y - 1.0) / 2.0
+        else:
+            # Empirical shifts: (+2.36, +1.52) at 1920x1080.
+            # Scale relative to the 320x240 network input.
+            offset_x = (2.36 + 0.5) * scale_x / 6.0 - 0.5
+            offset_y = (1.52 + 0.5) * scale_y / 4.5 - 0.5
+
         by_id = {}
 
         for x, y, corner_id in keypoints:
@@ -184,8 +208,8 @@ class DeepCharucoDetector:
             ).append(
                 np.asarray(
                     [
-                        float(x) * scale_x,
-                        float(y) * scale_y,
+                        float(x) * scale_x + offset_x,
+                        float(y) * scale_y + offset_y,
                     ],
                     dtype=np.float32,
                 )
