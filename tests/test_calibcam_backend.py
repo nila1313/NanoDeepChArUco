@@ -3,8 +3,14 @@ from types import SimpleNamespace
 from unittest.mock import Mock
 
 import numpy as np
+import pytest
 
-from nanodeepcharuco.calibcam_backend import (
+pytest.importorskip(
+    "calibcam.detection_backends",
+    reason="requires calibcam with detection backend support",
+)
+
+from nanodeepcharuco.calibcam_backend import (  # noqa: E402
     NanoDeepCharucoBackend,
     _nanodeep_frame_prefix,
     _normalize_nanodeep_config_paths,
