@@ -1,10 +1,14 @@
+from __future__ import annotations
+
 import hashlib
 from pathlib import Path
-from typing import Any, Mapping
+from typing import TYPE_CHECKING, Any, Mapping
 
 import numpy as np
 from calibcam.detection_backends import DetectionBackend
-from calibcamlib import Board
+
+if TYPE_CHECKING:
+    from calibcamlib import Board
 
 
 def _normalize_nanodeep_config_paths(config):
@@ -112,34 +116,6 @@ def _nanodeep_corners_to_charuco(corners_by_id):
     return charuco_corners, charuco_ids
 
 
-def create_context(video, board, opts):
-    """Create per-video state for NanoDeepCharuco detection."""
-    return {
-        "detector": _build_nanodeep_detector(
-            board,
-            opts["detection_opts"]["nanodeepcharuco"],
-        ),
-        "frame_prefix": _nanodeep_frame_prefix(video),
-    }
-
-
-def detect_frame(frame, frame_idx, context):
-    """Detect ChArUco corners in one frame with NanoDeepCharuco."""
-    frame_tag = (
-        f"{context['frame_prefix']}_"
-        f"{int(frame_idx):08d}"
-    )
-
-    result = context["detector"].process_frame(
-        frame,
-        frame_tag,
-    )
-
-    return _nanodeep_corners_to_charuco(
-        result.corners
-    )
-
-
 class NanoDeepCharucoBackend(DetectionBackend):
     """CalibCam adapter for NanoDeepCharuco detection."""
 
@@ -164,7 +140,16 @@ class NanoDeepCharucoBackend(DetectionBackend):
         board: Board,
         opts: Mapping[str, Any],
     ) -> Any:
-        return create_context(video, board, opts)
+        # Local config: backend defaults overridden by the user's options.
+        # opts itself is not modified.
+        config = {
+            **self.default_opts,
+            **opts["detection_opts"].get("nanodeepcharuco", {}),
+        }
+        return {
+            "detector": _build_nanodeep_detector(board, config),
+            "frame_prefix": _nanodeep_frame_prefix(video),
+        }
 
     def detect_frame(
         self,
@@ -172,4 +157,6 @@ class NanoDeepCharucoBackend(DetectionBackend):
         frame_idx: int,
         context: Any,
     ) -> tuple[np.ndarray | None, np.ndarray | None]:
-        return detect_frame(frame, frame_idx, context)
+        frame_tag = f"{context['frame_prefix']}_{int(frame_idx):08d}"
+        result = context["detector"].process_frame(frame, frame_tag)
+        return _nanodeep_corners_to_charuco(result.corners)

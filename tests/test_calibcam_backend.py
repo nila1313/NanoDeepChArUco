@@ -89,3 +89,24 @@ def test_missing_required_options_raise_without_loading_models():
 def test_backend_receives_raw_frames():
     """NanoDeepCharuco was validated on raw frames, so calibcam must not preprocess them."""
     assert NanoDeepCharucoBackend.uses_preprocessing is False
+
+
+def test_create_context_fills_defaults_locally_without_changing_opts():
+    from copy import deepcopy
+    from unittest.mock import patch
+
+    opts = {"detection_opts": {"nanodeepcharuco": {"work_dir": Path("/tmp/work")}}}
+    original = deepcopy(opts)
+
+    with patch(
+        "nanodeepcharuco.calibcam_backend._build_nanodeep_detector",
+        return_value="detector",
+    ) as build:
+        context = NanoDeepCharucoBackend().create_context("/tmp/left.mp4", object(), opts)
+
+    config = build.call_args.args[1]
+    assert config["work_dir"] == Path("/tmp/work")
+    assert config["keep_work"] is False  # filled from default_opts
+    assert set(config) == set(NanoDeepCharucoBackend.default_opts)
+    assert context["detector"] == "detector"
+    assert opts == original
