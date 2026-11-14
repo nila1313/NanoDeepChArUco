@@ -91,6 +91,11 @@ repository root:
 python -m pip install -e ".[nanodeepcharuco]"
 ```
 
+`pyproject.toml` does not pin package versions, so this works in an existing
+CalibCam environment. The exact versions of the validated setup are listed in
+`environment.yml`. OpenCV 5 is not supported yet (it removed
+`interpolateCornersCharuco`, which the Nano path uses).
+
 The package registers itself as a CalibCam detection backend. Check that
 CalibCam finds it:
 
