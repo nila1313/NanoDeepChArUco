@@ -7,25 +7,24 @@ name = "nanodeepcharuco"
 version = "2.1.0"
 description = "CalibCam-compatible stereo ChArUco detection pipeline using OpenCV, ArUco Nano, and DeepChArUco"
 readme = "README.md"
-requires-python = ">=3.10,<3.11"
+requires-python = ">=3.10"
 dependencies = [
-    "numpy>=1.24",
-    "opencv-contrib-python-headless>=4.10,<4.12",
+    "numpy",
+    "opencv-contrib-python-headless>=4.7",
+    "pyyaml",
 ]
 
 [project.optional-dependencies]
 nanodeepcharuco = [
-    "PyYAML==6.0.3",
-    "setuptools>=68,<81",
-    "numba>=0.59,<0.60",
-    "torch==2.0.1",
-    "pytorch-lightning==1.9.3",
-    "torchmetrics==0.11.1",
-    "pydantic==2.13.5",
+    "numba",
+    "pydantic",
+    "pytorch-lightning",
+    "torch",
+    "torchmetrics",
 ]
 
 test = [
-    "pytest>=8,<9",
+    "pytest",
 ]
 
 [project.scripts]
